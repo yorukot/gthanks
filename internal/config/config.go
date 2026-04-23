@@ -8,6 +8,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/joho/godotenv"
 )
 
 const (
@@ -36,6 +38,8 @@ type Config struct {
 }
 
 func Load() (Config, error) {
+	loadDotEnv()
+
 	cfg := Config{
 		AppEnv:             getEnv("APP_ENV", defaultAppEnv),
 		Port:               getEnv("PORT", defaultPort),
@@ -62,6 +66,15 @@ func Load() (Config, error) {
 	}
 
 	return cfg, nil
+}
+
+func loadDotEnv() {
+	if _, err := os.Stat(".env"); err != nil {
+		return
+	}
+
+	// Existing environment variables keep precedence over values in .env.
+	_ = godotenv.Load()
 }
 
 func (c Config) Validate() error {

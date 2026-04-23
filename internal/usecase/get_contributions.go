@@ -14,9 +14,10 @@ import (
 )
 
 type GetContributionsInput struct {
-	Target  string
-	Refresh bool
-	Summary bool
+	Target       string
+	Refresh      bool
+	Summary      bool
+	IncludeForks bool
 }
 
 type Service struct {
@@ -29,13 +30,25 @@ func NewService(cfg config.Config, store port.Store, github port.GitHubClient) *
 	return &Service{cfg: cfg, store: store, github: github}
 }
 
+func (s *Service) Store() port.Store {
+	return s.store
+}
+
+func (s *Service) GetImageCache(ctx context.Context, cacheKey string) (*domain.CachedBinary, error) {
+	return s.store.GetImageCache(ctx, cacheKey)
+}
+
+func (s *Service) SaveImageCache(ctx context.Context, record domain.ImageCacheRecord) error {
+	return s.store.SaveImageCache(ctx, record)
+}
+
 func (s *Service) GetContributions(ctx context.Context, input GetContributionsInput) (domain.ContributionResponse, error) {
 	target, err := domain.ParseTarget(input.Target)
 	if err != nil {
 		return domain.ContributionResponse{}, err
 	}
 
-	cacheKey := buildCacheKey(target, input.Summary)
+	cacheKey := buildCacheKey(target, input.Summary, input.IncludeForks)
 	cached, err := s.store.GetQueryCache(ctx, cacheKey)
 	if err != nil {
 		return domain.ContributionResponse{}, fmt.Errorf("%w: get query cache: %v", domain.ErrDatabase, err)
@@ -53,7 +66,7 @@ func (s *Service) GetContributions(ctx context.Context, input GetContributionsIn
 		return response, nil
 	}
 
-	response, liveErr := s.fetchLive(ctx, target, input.Summary)
+	response, liveErr := s.fetchLive(ctx, target, input.Summary, input.IncludeForks)
 	if liveErr == nil {
 		response.Metadata.GeneratedAt = now
 		if input.Refresh {
@@ -83,7 +96,7 @@ func (s *Service) GetContributions(ctx context.Context, input GetContributionsIn
 	return domain.ContributionResponse{}, liveErr
 }
 
-func (s *Service) fetchLive(ctx context.Context, target domain.Target, includeSummary bool) (domain.ContributionResponse, error) {
+func (s *Service) fetchLive(ctx context.Context, target domain.Target, includeSummary bool, includeForks bool) (domain.ContributionResponse, error) {
 	response := domain.ContributionResponse{
 		Metadata: domain.Metadata{
 			Input:            target.Input,
@@ -119,6 +132,9 @@ func (s *Service) fetchLive(ctx context.Context, target domain.Target, includeSu
 
 		var partialErrors []domain.ErrorDetail
 		for _, repo := range repos {
+			if repo.Fork && !includeForks {
+				continue
+			}
 			contributors, requests, err := s.github.ListRepositoryContributors(ctx, repo.Owner, repo.Name)
 			response.GitHubRequestCount += requests
 			if err != nil {
@@ -172,7 +188,7 @@ func (s *Service) persistResponse(ctx context.Context, cacheKey string, target d
 func buildSummary(repos []domain.Repo) []domain.SummaryItem {
 	type aggregate struct {
 		item  domain.SummaryItem
-		repos map[string]struct{}
+		repos map[string]domain.SummaryRepo
 	}
 
 	items := map[string]*aggregate{}
@@ -187,18 +203,32 @@ func buildSummary(repos []domain.Repo) []domain.SummaryItem {
 						AvatarURL:   contributor.AvatarURL,
 						HTMLURL:     contributor.HTMLURL,
 					},
-					repos: map[string]struct{}{},
+					repos: map[string]domain.SummaryRepo{},
 				}
 				items[contributor.IdentityKey] = entry
 			}
 			entry.item.TotalContributions += contributor.Contributions
-			entry.repos[repo.FullName] = struct{}{}
+			entry.repos[repo.FullName] = domain.SummaryRepo{
+				FullName:      repo.FullName,
+				HTMLURL:       repo.HTMLURL,
+				Contributions: contributor.Contributions,
+			}
 		}
 	}
 
 	summary := make([]domain.SummaryItem, 0, len(items))
 	for _, entry := range items {
 		entry.item.RepoCount = len(entry.repos)
+		entry.item.Repos = make([]domain.SummaryRepo, 0, len(entry.repos))
+		for _, repo := range entry.repos {
+			entry.item.Repos = append(entry.item.Repos, repo)
+		}
+		sort.Slice(entry.item.Repos, func(i, j int) bool {
+			if entry.item.Repos[i].Contributions != entry.item.Repos[j].Contributions {
+				return entry.item.Repos[i].Contributions > entry.item.Repos[j].Contributions
+			}
+			return entry.item.Repos[i].FullName < entry.item.Repos[j].FullName
+		})
 		summary = append(summary, entry.item)
 	}
 
@@ -215,8 +245,8 @@ func buildSummary(repos []domain.Repo) []domain.SummaryItem {
 	return summary
 }
 
-func buildCacheKey(target domain.Target, summary bool) string {
-	return fmt.Sprintf("%s|summary=%t", target.NormalizedTarget, summary)
+func buildCacheKey(target domain.Target, summary bool, includeForks bool) string {
+	return fmt.Sprintf("%s|summary=%t|include_forks=%t", target.NormalizedTarget, summary, includeForks)
 }
 
 func ttlForMode(cfg config.Config, mode string) time.Duration {

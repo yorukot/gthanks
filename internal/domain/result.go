@@ -39,12 +39,19 @@ type Repo struct {
 }
 
 type SummaryItem struct {
-	IdentityKey        string `json:"identity_key"`
-	Login              string `json:"login,omitempty"`
-	AvatarURL          string `json:"avatar_url,omitempty"`
-	HTMLURL            string `json:"html_url,omitempty"`
-	TotalContributions int    `json:"total_contributions"`
-	RepoCount          int    `json:"repo_count"`
+	IdentityKey        string        `json:"identity_key"`
+	Login              string        `json:"login,omitempty"`
+	AvatarURL          string        `json:"avatar_url,omitempty"`
+	HTMLURL            string        `json:"html_url,omitempty"`
+	TotalContributions int           `json:"total_contributions"`
+	RepoCount          int           `json:"repo_count"`
+	Repos              []SummaryRepo `json:"repos,omitempty"`
+}
+
+type SummaryRepo struct {
+	FullName      string `json:"full_name"`
+	HTMLURL       string `json:"html_url,omitempty"`
+	Contributions int    `json:"contributions"`
 }
 
 type ErrorDetail struct {

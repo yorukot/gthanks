@@ -46,6 +46,60 @@ WHERE cache_key = ?`
 	}, nil
 }
 
+func (s *Store) GetImageCache(ctx context.Context, cacheKey string) (*domain.CachedBinary, error) {
+	const query = `
+SELECT image_png, expires_at
+FROM image_cache
+WHERE cache_key = ?`
+	row := s.db.QueryRowContext(ctx, query, cacheKey)
+
+	var raw []byte
+	var expiresAt string
+	if err := row.Scan(&raw, &expiresAt); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	parsed, err := time.Parse(time.RFC3339Nano, expiresAt)
+	if err != nil {
+		return nil, err
+	}
+
+	return &domain.CachedBinary{
+		Content:   raw,
+		ExpiresAt: parsed,
+	}, nil
+}
+
+func (s *Store) GetAvatarCache(ctx context.Context, avatarURL string) (*domain.CachedBinary, error) {
+	const query = `
+SELECT content, expires_at
+FROM avatar_cache
+WHERE avatar_url = ?`
+	row := s.db.QueryRowContext(ctx, query, avatarURL)
+
+	var raw []byte
+	var expiresAt string
+	if err := row.Scan(&raw, &expiresAt); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	parsed, err := time.Parse(time.RFC3339Nano, expiresAt)
+	if err != nil {
+		return nil, err
+	}
+
+	return &domain.CachedBinary{
+		Content:   raw,
+		ExpiresAt: parsed,
+	}, nil
+}
+
 func (s *Store) SaveQueryCache(ctx context.Context, record domain.QueryCacheRecord) error {
 	targetID, err := s.upsertTarget(ctx, record.Target)
 	if err != nil {
@@ -69,6 +123,57 @@ ON CONFLICT(cache_key) DO UPDATE SET
 		targetID,
 		record.ResponseJSON,
 		record.CacheStatus,
+		now,
+		now,
+		record.ExpiresAt.UTC().Format(time.RFC3339Nano),
+	)
+	return err
+}
+
+func (s *Store) SaveImageCache(ctx context.Context, record domain.ImageCacheRecord) error {
+	targetID, err := s.upsertTarget(ctx, record.Target)
+	if err != nil {
+		return err
+	}
+
+	const query = `
+INSERT INTO image_cache (cache_key, target_id, image_png, cache_status, created_at, updated_at, expires_at)
+VALUES (?, ?, ?, ?, ?, ?, ?)
+ON CONFLICT(cache_key) DO UPDATE SET
+	target_id = excluded.target_id,
+	image_png = excluded.image_png,
+	cache_status = excluded.cache_status,
+	updated_at = excluded.updated_at,
+	expires_at = excluded.expires_at`
+	now := time.Now().UTC().Format(time.RFC3339Nano)
+	_, err = s.db.ExecContext(
+		ctx,
+		query,
+		record.CacheKey,
+		targetID,
+		record.ImagePNG,
+		record.CacheStatus,
+		now,
+		now,
+		record.ExpiresAt.UTC().Format(time.RFC3339Nano),
+	)
+	return err
+}
+
+func (s *Store) SaveAvatarCache(ctx context.Context, record domain.AvatarCacheRecord) error {
+	const query = `
+INSERT INTO avatar_cache (avatar_url, content, created_at, updated_at, expires_at)
+VALUES (?, ?, ?, ?, ?)
+ON CONFLICT(avatar_url) DO UPDATE SET
+	content = excluded.content,
+	updated_at = excluded.updated_at,
+	expires_at = excluded.expires_at`
+	now := time.Now().UTC().Format(time.RFC3339Nano)
+	_, err := s.db.ExecContext(
+		ctx,
+		query,
+		record.AvatarURL,
+		record.Content,
 		now,
 		now,
 		record.ExpiresAt.UTC().Format(time.RFC3339Nano),

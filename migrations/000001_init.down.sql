@@ -1,0 +1,6 @@
+DROP TABLE IF EXISTS query_cache;
+DROP TABLE IF EXISTS repo_contributors;
+DROP TABLE IF EXISTS contributors;
+DROP TABLE IF EXISTS target_repos;
+DROP TABLE IF EXISTS repos;
+DROP TABLE IF EXISTS targets;

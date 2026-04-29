@@ -40,10 +40,9 @@ func NewRouter(cfg config.Config, logger *slog.Logger, service *usecase.Service)
 
 	r := chi.NewRouter()
 	r.Use(chimiddleware.RequestID)
-	r.Use(chimiddleware.RealIP)
 	r.Use(chimiddleware.Recoverer)
 	r.Use(chimiddleware.Timeout(cfg.RequestTimeout))
-	r.Use(middleware.RequestLogger(logger))
+	r.Use(middleware.RequestLogger(logger, middleware.NewRealIPResolver()))
 
 	r.Get("/", indexHandler())
 	r.Get("/favicon.svg", svgHandler(logoSVG))

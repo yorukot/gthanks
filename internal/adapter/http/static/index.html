@@ -1,0 +1,860 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>gthanks URL generator</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --base: #191724;
+      --surface: #1f1d2e;
+      --overlay: #26233a;
+      --muted: #6e6a86;
+      --subtle: #908caa;
+      --text: #e0def4;
+      --love: #eb6f92;
+      --gold: #f6c177;
+      --rose: #ebbcba;
+      --pine: #31748f;
+      --foam: #9ccfd8;
+      --iris: #c4a7e7;
+      --highlight-low: #21202e;
+      --highlight-med: #403d52;
+      --highlight-high: #524f67;
+      --shadow: rgba(0, 0, 0, 0.22);
+      font-family:
+        Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+        "Segoe UI", sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-width: 320px;
+      min-height: 100vh;
+      color: var(--text);
+      background:
+        linear-gradient(180deg, rgba(38, 35, 58, 0.65), transparent 320px),
+        var(--base);
+    }
+
+    button,
+    input,
+    select {
+      font: inherit;
+    }
+
+    button {
+      border: 1px solid var(--highlight-high);
+      border-radius: 8px;
+      color: var(--text);
+      background: var(--overlay);
+      cursor: pointer;
+      transition: border-color 140ms ease, background 140ms ease, color 140ms ease;
+    }
+
+    button:hover:not(:disabled) {
+      border-color: var(--foam);
+      color: var(--foam);
+      background: var(--highlight-med);
+    }
+
+    button:disabled {
+      color: var(--muted);
+      cursor: not-allowed;
+      opacity: 0.65;
+    }
+
+    input,
+    select,
+    textarea {
+      width: 100%;
+      min-height: 42px;
+      border: 1px solid var(--highlight-high);
+      border-radius: 8px;
+      color: var(--text);
+      background: var(--base);
+      outline: none;
+    }
+
+    input,
+    select {
+      padding: 0 12px;
+    }
+
+    textarea {
+      min-height: 108px;
+      padding: 12px;
+      resize: vertical;
+      font-family:
+        "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+      line-height: 1.5;
+    }
+
+    input:focus,
+    select:focus,
+    textarea:focus {
+      border-color: var(--iris);
+      box-shadow: 0 0 0 3px rgba(196, 167, 231, 0.14);
+    }
+
+    label,
+    legend {
+      display: block;
+      margin: 0 0 8px;
+      color: var(--subtle);
+      font-size: 0.9rem;
+      font-weight: 600;
+    }
+
+    fieldset {
+      margin: 0;
+      padding: 0;
+      border: 0;
+    }
+
+    .page {
+      width: min(1120px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 28px 0 40px;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      min-width: 0;
+    }
+
+    .mark {
+      display: grid;
+      width: 38px;
+      height: 38px;
+      place-items: center;
+      border: 1px solid var(--highlight-high);
+      border-radius: 8px;
+      color: var(--base);
+      background: var(--rose);
+      box-shadow: 0 12px 28px var(--shadow);
+      font-weight: 800;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 1.45rem;
+      line-height: 1.15;
+    }
+
+    .theme-note {
+      color: var(--subtle);
+      font-size: 0.9rem;
+      white-space: nowrap;
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: minmax(0, 1.02fr) minmax(340px, 0.98fr);
+      gap: 18px;
+      align-items: start;
+    }
+
+    .panel {
+      border: 1px solid var(--highlight-med);
+      border-radius: 8px;
+      background: rgba(31, 29, 46, 0.94);
+      box-shadow: 0 18px 48px var(--shadow);
+    }
+
+    .panel-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      padding: 18px 20px;
+      border-bottom: 1px solid var(--highlight-med);
+    }
+
+    .panel-title {
+      margin: 0;
+      font-size: 1rem;
+      line-height: 1.2;
+    }
+
+    .status {
+      max-width: 44ch;
+      color: var(--foam);
+      font-size: 0.88rem;
+      text-align: right;
+    }
+
+    .status.invalid {
+      color: var(--gold);
+    }
+
+    .panel-body {
+      padding: 20px;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 16px;
+    }
+
+    .field {
+      min-width: 0;
+    }
+
+    .field.wide {
+      grid-column: 1 / -1;
+    }
+
+    .segmented {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+      padding: 5px;
+      border: 1px solid var(--highlight-med);
+      border-radius: 8px;
+      background: var(--base);
+    }
+
+    .segment {
+      position: relative;
+      margin: 0;
+    }
+
+    .segment input {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .segment span {
+      display: flex;
+      min-height: 38px;
+      align-items: center;
+      justify-content: center;
+      padding: 8px 10px;
+      border-radius: 6px;
+      color: var(--subtle);
+      text-align: center;
+      cursor: pointer;
+    }
+
+    .segment input:checked + span {
+      color: var(--base);
+      background: var(--iris);
+      font-weight: 700;
+    }
+
+    .checks {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+      grid-column: 1 / -1;
+    }
+
+    .check {
+      display: flex;
+      min-height: 44px;
+      align-items: center;
+      gap: 10px;
+      margin: 0;
+      padding: 10px 12px;
+      border: 1px solid var(--highlight-med);
+      border-radius: 8px;
+      color: var(--text);
+      background: var(--base);
+      cursor: pointer;
+    }
+
+    .check input {
+      width: 18px;
+      min-height: 18px;
+      accent-color: var(--iris);
+    }
+
+    .options {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 16px;
+      grid-column: 1 / -1;
+      padding-top: 2px;
+    }
+
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 18px;
+    }
+
+    .actions button {
+      min-height: 42px;
+      padding: 0 14px;
+      font-weight: 700;
+    }
+
+    .primary {
+      border-color: var(--foam);
+      color: var(--base);
+      background: var(--foam);
+    }
+
+    .primary:hover:not(:disabled) {
+      color: var(--base);
+      background: var(--rose);
+      border-color: var(--rose);
+    }
+
+    .result-stack {
+      display: grid;
+      gap: 16px;
+    }
+
+    .result-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 8px;
+    }
+
+    .result-head h3 {
+      margin: 0;
+      color: var(--subtle);
+      font-size: 0.9rem;
+    }
+
+    .copy {
+      min-height: 34px;
+      padding: 0 10px;
+      font-size: 0.88rem;
+      font-weight: 700;
+    }
+
+    .url-output {
+      min-height: 84px;
+    }
+
+    .preview {
+      display: none;
+      border-top: 1px solid var(--highlight-med);
+      padding-top: 16px;
+    }
+
+    .preview.is-visible {
+      display: block;
+    }
+
+    .preview-frame {
+      display: grid;
+      min-height: 180px;
+      place-items: center;
+      overflow: auto;
+      border: 1px solid var(--highlight-med);
+      border-radius: 8px;
+      background:
+        linear-gradient(45deg, var(--base) 25%, transparent 25%),
+        linear-gradient(-45deg, var(--base) 25%, transparent 25%),
+        linear-gradient(45deg, transparent 75%, var(--base) 75%),
+        linear-gradient(-45deg, transparent 75%, var(--base) 75%),
+        var(--surface);
+      background-position: 0 0, 0 10px, 10px -10px, -10px 0;
+      background-size: 20px 20px;
+    }
+
+    .preview-frame img {
+      display: block;
+      max-width: 100%;
+      height: auto;
+    }
+
+    .preview-empty {
+      padding: 24px;
+      color: var(--muted);
+      text-align: center;
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    @media (max-width: 880px) {
+      .layout,
+      .grid,
+      .options {
+        grid-template-columns: 1fr;
+      }
+
+      .checks {
+        grid-template-columns: 1fr;
+      }
+
+      .theme-note {
+        display: none;
+      }
+    }
+
+    @media (max-width: 560px) {
+      .page {
+        width: min(100% - 20px, 1120px);
+        padding-top: 18px;
+      }
+
+      .topbar,
+      .panel-header {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+
+      .status {
+        text-align: left;
+      }
+
+      .segmented {
+        grid-template-columns: 1fr;
+      }
+
+      .actions button {
+        flex: 1 1 140px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <header class="topbar">
+      <div class="brand">
+        <div class="mark" aria-hidden="true">g</div>
+        <h1>gthanks URL generator</h1>
+      </div>
+      <div class="theme-note">Rose Pine main</div>
+    </header>
+
+    <div class="layout">
+      <section class="panel" aria-labelledby="controls-title">
+        <div class="panel-header">
+          <h2 class="panel-title" id="controls-title">Request</h2>
+          <div class="status" id="status" role="status" aria-live="polite">Ready</div>
+        </div>
+        <div class="panel-body">
+          <div class="grid">
+            <fieldset class="field wide">
+              <legend>Endpoint</legend>
+              <div class="segmented">
+                <label class="segment">
+                  <input type="radio" name="endpoint" value="image" checked>
+                  <span>Image</span>
+                </label>
+                <label class="segment">
+                  <input type="radio" name="endpoint" value="contributions">
+                  <span>JSON</span>
+                </label>
+              </div>
+            </fieldset>
+
+            <div class="field wide">
+              <label for="base-url">Base URL</label>
+              <input id="base-url" type="url" autocomplete="url" spellcheck="false">
+            </div>
+
+            <div class="field wide" data-target-field>
+              <label for="target">Target</label>
+              <input id="target" type="text" autocomplete="off" spellcheck="false" placeholder="yorukot or yorukot/superfile">
+            </div>
+
+            <div class="checks" data-shared-options>
+              <label class="check">
+                <input id="refresh" type="checkbox">
+                <span>refresh</span>
+              </label>
+              <label class="check" data-summary-option>
+                <input id="summary" type="checkbox" checked>
+                <span>summary</span>
+              </label>
+              <label class="check">
+                <input id="include-forks" type="checkbox">
+                <span>include_forks</span>
+              </label>
+            </div>
+
+            <div class="options hidden" data-image-options>
+              <div class="field">
+                <label for="per-row">per_row</label>
+                <input id="per-row" type="number" min="1" max="20" step="1" value="5">
+              </div>
+              <div class="field">
+                <label for="width">width</label>
+                <input id="width" type="number" min="100" max="4000" step="1" value="1200">
+              </div>
+              <div class="field">
+                <label for="shape">shape</label>
+                <select id="shape">
+                  <option value="circle" selected>circle</option>
+                  <option value="square">square</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="limit">limit</label>
+                <input id="limit" type="number" min="1" max="10000" step="1" value="50">
+              </div>
+              <div class="field">
+                <label for="padding">padding</label>
+                <input id="padding" type="number" min="0" max="500" step="1" value="0">
+              </div>
+              <div class="field">
+                <label for="space">space</label>
+                <input id="space" type="number" min="0" max="500" step="1" value="0">
+              </div>
+            </div>
+          </div>
+
+          <div class="actions">
+            <button class="primary" id="open-url" type="button">Open URL</button>
+            <button id="preview-image" type="button">Preview Image</button>
+            <button id="reset-form" type="button">Reset</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel" aria-labelledby="output-title">
+        <div class="panel-header">
+          <h2 class="panel-title" id="output-title">Output</h2>
+        </div>
+        <div class="panel-body result-stack">
+          <div>
+            <div class="result-head">
+              <h3>URL</h3>
+              <button class="copy" type="button" data-copy="url-output">Copy URL</button>
+            </div>
+            <textarea class="url-output" id="url-output" readonly spellcheck="false"></textarea>
+          </div>
+
+          <div>
+            <div class="result-head">
+              <h3>curl</h3>
+              <button class="copy" type="button" data-copy="curl-output">Copy curl</button>
+            </div>
+            <textarea id="curl-output" readonly spellcheck="false"></textarea>
+          </div>
+
+          <div class="preview" id="preview">
+            <div class="result-head">
+              <h3>Preview</h3>
+              <button class="copy" type="button" data-copy="image-markdown">Copy Markdown</button>
+            </div>
+            <input id="image-markdown" type="text" readonly spellcheck="false">
+            <div class="preview-frame" id="preview-frame">
+              <div class="preview-empty">No image loaded</div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <script>
+    const defaults = {
+      target: "yorukot",
+      perRow: "5",
+      width: "1200",
+      shape: "circle",
+      limit: "50",
+      padding: "0",
+      space: "0"
+    };
+
+    const state = {
+      lastPreviewURL: ""
+    };
+
+    const el = {
+      baseURL: document.querySelector("#base-url"),
+      target: document.querySelector("#target"),
+      refresh: document.querySelector("#refresh"),
+      summary: document.querySelector("#summary"),
+      includeForks: document.querySelector("#include-forks"),
+      perRow: document.querySelector("#per-row"),
+      width: document.querySelector("#width"),
+      shape: document.querySelector("#shape"),
+      limit: document.querySelector("#limit"),
+      padding: document.querySelector("#padding"),
+      space: document.querySelector("#space"),
+      targetField: document.querySelector("[data-target-field]"),
+      sharedOptions: document.querySelector("[data-shared-options]"),
+      summaryOption: document.querySelector("[data-summary-option]"),
+      imageOptions: document.querySelector("[data-image-options]"),
+      status: document.querySelector("#status"),
+      openURL: document.querySelector("#open-url"),
+      previewImage: document.querySelector("#preview-image"),
+      resetForm: document.querySelector("#reset-form"),
+      urlOutput: document.querySelector("#url-output"),
+      curlOutput: document.querySelector("#curl-output"),
+      preview: document.querySelector("#preview"),
+      previewFrame: document.querySelector("#preview-frame"),
+      imageMarkdown: document.querySelector("#image-markdown")
+    };
+
+    const endpointInputs = Array.from(document.querySelectorAll("input[name='endpoint']"));
+    const formInputs = Array.from(document.querySelectorAll("input, select"));
+
+    function initialBaseURL() {
+      if (window.location.protocol === "http:" || window.location.protocol === "https:") {
+        return window.location.origin;
+      }
+      return "http://localhost:8080";
+    }
+
+    function endpoint() {
+      return endpointInputs.find((input) => input.checked).value;
+    }
+
+    function cleanBaseURL(value) {
+      const trimmed = value.trim();
+      return (trimmed || initialBaseURL()).replace(/\/+$/, "");
+    }
+
+    function boolText(input) {
+      return input.checked ? "true" : "false";
+    }
+
+    function numberValue(input) {
+      return Number.parseInt(input.value, 10);
+    }
+
+    function validateTarget(value) {
+      const trimmed = value.trim();
+      if (!trimmed) {
+        return "target is required";
+      }
+      if (/\s/.test(trimmed)) {
+        return "target cannot contain spaces";
+      }
+      const parts = trimmed.split("/");
+      if (parts.length > 2 || parts.some((part) => part === "")) {
+        return "target must be owner or owner/repo";
+      }
+      return "";
+    }
+
+    function validateRange(label, value, min, max) {
+      if (!Number.isInteger(value)) {
+        return label + " must be an integer";
+      }
+      if (value < min || value > max) {
+        return label + " must be between " + min + " and " + max;
+      }
+      return "";
+    }
+
+    function validateImageOptions() {
+      const perRow = numberValue(el.perRow);
+      const width = numberValue(el.width);
+      const limit = numberValue(el.limit);
+      const padding = numberValue(el.padding);
+      const space = numberValue(el.space);
+      const checks = [
+        validateRange("per_row", perRow, 1, 20),
+        validateRange("width", width, 100, 4000),
+        validateRange("limit", limit, 1, 10000),
+        validateRange("padding", padding, 0, 500),
+        validateRange("space", space, 0, 500)
+      ].filter(Boolean);
+
+      if (checks.length > 0) {
+        return checks[0];
+      }
+      if (width <= padding * 2 + (perRow - 1) * space) {
+        return "width is too small for padding, space, and per_row";
+      }
+      if (width < padding * 2 + Math.min(perRow, limit)) {
+        return "width is too small for padding";
+      }
+      return "";
+    }
+
+    function validationMessage() {
+      const selected = endpoint();
+      const targetError = validateTarget(el.target.value);
+      if (targetError) {
+        return targetError;
+      }
+      if (selected === "image") {
+        return validateImageOptions();
+      }
+      return "";
+    }
+
+    function buildURL() {
+      const selected = endpoint();
+      const base = cleanBaseURL(el.baseURL.value);
+      const path = {
+        contributions: "/v1/contributions",
+        image: "/v1/contributions/image"
+      }[selected];
+
+      const params = new URLSearchParams();
+      params.set("target", el.target.value.trim());
+      params.set("refresh", boolText(el.refresh));
+      params.set("include_forks", boolText(el.includeForks));
+
+      if (selected === "contributions") {
+        params.set("summary", boolText(el.summary));
+      }
+
+      if (selected === "image") {
+        params.set("per_row", el.perRow.value);
+        params.set("width", el.width.value);
+        params.set("shape", el.shape.value);
+        params.set("limit", el.limit.value);
+        params.set("padding", el.padding.value);
+        params.set("space", el.space.value);
+      }
+
+      return base + path + "?" + params.toString();
+    }
+
+    function curlFor(url) {
+      const escaped = url.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+      if (endpoint() === "image") {
+        return 'curl "' + escaped + '" --output contributors.png';
+      }
+      return 'curl "' + escaped + '"';
+    }
+
+    function markdownFor(url) {
+      return "![gthanks contributors](" + url + ")";
+    }
+
+    function setPreviewEmpty(message) {
+      el.previewFrame.innerHTML = "";
+      const empty = document.createElement("div");
+      empty.className = "preview-empty";
+      empty.textContent = message;
+      el.previewFrame.append(empty);
+    }
+
+    function updatePreviewVisibility() {
+      const isImage = endpoint() === "image";
+      el.preview.classList.toggle("is-visible", isImage);
+      el.previewImage.classList.toggle("hidden", !isImage);
+      if (!isImage) {
+        state.lastPreviewURL = "";
+        setPreviewEmpty("No image loaded");
+      }
+    }
+
+    function render() {
+      const selected = endpoint();
+      const error = validationMessage();
+      const url = buildURL();
+
+      el.summaryOption.classList.toggle("hidden", selected !== "contributions");
+      el.imageOptions.classList.toggle("hidden", selected !== "image");
+      updatePreviewVisibility();
+
+      el.status.textContent = error || "Ready";
+      el.status.classList.toggle("invalid", Boolean(error));
+      el.openURL.disabled = Boolean(error);
+      el.previewImage.disabled = Boolean(error) || selected !== "image";
+      el.urlOutput.value = url;
+      el.curlOutput.value = curlFor(url);
+      el.imageMarkdown.value = markdownFor(url);
+
+      if (selected === "image" && state.lastPreviewURL && state.lastPreviewURL !== url) {
+        state.lastPreviewURL = "";
+        setPreviewEmpty("Preview is out of date");
+      }
+    }
+
+    async function copyValue(id, button) {
+      const target = document.getElementById(id);
+      const value = target.value;
+      try {
+        await navigator.clipboard.writeText(value);
+      } catch (_err) {
+        target.focus();
+        target.select();
+        document.execCommand("copy");
+      }
+      const original = button.textContent;
+      button.textContent = "Copied";
+      window.setTimeout(() => {
+        button.textContent = original;
+      }, 1200);
+    }
+
+    function loadPreview() {
+      const error = validationMessage();
+      if (error) {
+        render();
+        return;
+      }
+      const url = buildURL();
+      state.lastPreviewURL = url;
+      el.previewFrame.innerHTML = "";
+      const img = document.createElement("img");
+      img.alt = "Contributor avatar grid";
+      img.src = url;
+      img.addEventListener("error", () => {
+        setPreviewEmpty("Image request failed");
+      });
+      el.previewFrame.append(img);
+    }
+
+    function resetForm() {
+      endpointInputs.find((input) => input.value === "image").checked = true;
+      el.baseURL.value = initialBaseURL();
+      el.target.value = defaults.target;
+      el.refresh.checked = false;
+      el.summary.checked = true;
+      el.includeForks.checked = false;
+      el.perRow.value = defaults.perRow;
+      el.width.value = defaults.width;
+      el.shape.value = defaults.shape;
+      el.limit.value = defaults.limit;
+      el.padding.value = defaults.padding;
+      el.space.value = defaults.space;
+      state.lastPreviewURL = "";
+      setPreviewEmpty("No image loaded");
+      render();
+    }
+
+    formInputs.forEach((input) => {
+      input.addEventListener("input", render);
+      input.addEventListener("change", render);
+    });
+
+    document.querySelectorAll("[data-copy]").forEach((button) => {
+      button.addEventListener("click", () => copyValue(button.dataset.copy, button));
+    });
+
+    el.openURL.addEventListener("click", () => {
+      if (!validationMessage()) {
+        window.open(buildURL(), "_blank", "noopener,noreferrer");
+      }
+    });
+
+    el.previewImage.addEventListener("click", loadPreview);
+    el.resetForm.addEventListener("click", resetForm);
+
+    resetForm();
+  </script>
+</body>
+</html>

@@ -2,6 +2,7 @@ package http
 
 import (
 	"context"
+	_ "embed"
 	"encoding/json"
 	"errors"
 	"log/slog"
@@ -19,6 +20,9 @@ import (
 	"github.com/go-chi/chi/v5"
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
 )
+
+//go:embed static/index.html
+var indexHTML string
 
 const backgroundImageJobTimeout = 2 * time.Minute
 
@@ -38,6 +42,7 @@ func NewRouter(cfg config.Config, logger *slog.Logger, service *usecase.Service)
 	r.Use(chimiddleware.Timeout(cfg.RequestTimeout))
 	r.Use(middleware.RequestLogger(logger))
 
+	r.Get("/", indexHandler())
 	r.Get("/healthz", func(w nethttp.ResponseWriter, _ *nethttp.Request) {
 		writeJSON(w, nethttp.StatusOK, map[string]any{
 			"status": "ok",
@@ -48,6 +53,14 @@ func NewRouter(cfg config.Config, logger *slog.Logger, service *usecase.Service)
 	r.Get("/v1/contributions/image", contributionsImageHandler(cfg, service, renderer))
 
 	return r
+}
+
+func indexHandler() nethttp.HandlerFunc {
+	return func(w nethttp.ResponseWriter, _ *nethttp.Request) {
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		w.WriteHeader(nethttp.StatusOK)
+		_, _ = w.Write([]byte(indexHTML))
+	}
 }
 
 func contributionsHandler(service *usecase.Service) nethttp.HandlerFunc {

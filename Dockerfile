@@ -1,3 +1,5 @@
+# syntax=docker/dockerfile:1.7
+
 FROM golang:1.25-alpine AS builder
 
 WORKDIR /src
@@ -5,11 +7,13 @@ WORKDIR /src
 RUN apk add --no-cache build-base
 
 COPY go.mod go.sum ./
-RUN go mod download
+RUN --mount=type=cache,target=/go/pkg/mod go mod download
 
 COPY . .
 
-RUN CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build -o /out/gthanks ./cmd/server
+RUN --mount=type=cache,target=/go/pkg/mod \
+	--mount=type=cache,target=/root/.cache/go-build \
+	CGO_ENABLED=1 GOOS=linux go build -v -trimpath -o /out/gthanks ./cmd/server
 
 FROM alpine:3.22
 

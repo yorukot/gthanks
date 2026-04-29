@@ -5,6 +5,7 @@ import (
 	"image"
 	"image/color"
 	"image/png"
+	"math"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -28,7 +29,7 @@ func TestRenderSquareGrid(t *testing.T) {
 	img, err := renderer.Render(context.Background(), []domain.SummaryItem{
 		{Login: "alice", AvatarURL: server.URL},
 		{Login: "bob", AvatarURL: server.URL},
-	}, Options{PerRow: 2, Width: 200, Shape: ShapeSquare, Limit: 2})
+	}, Options{PerRow: 2, Width: 200, Shape: ShapeSquare, Limit: 2, SpaceSet: true})
 	if err != nil {
 		t.Fatalf("render: %v", err)
 	}
@@ -98,5 +99,35 @@ func TestNormalizeOptionsValidation(t *testing.T) {
 	_, err := normalizeOptions(Options{Width: 99, Shape: ShapeSquare})
 	if err == nil {
 		t.Fatal("expected width validation error")
+	}
+}
+
+func TestNormalizeOptionsDefaultsAndMaxLimit(t *testing.T) {
+	defaulted, err := normalizeOptions(Options{})
+	if err != nil {
+		t.Fatalf("normalize default options: %v", err)
+	}
+	if defaulted.PerRow != 12 {
+		t.Fatalf("expected default per_row 12, got %d", defaulted.PerRow)
+	}
+	if defaulted.Width != 1920 {
+		t.Fatalf("expected default width 1920, got %d", defaulted.Width)
+	}
+	if defaulted.Limit != 1000 {
+		t.Fatalf("expected default limit 1000, got %d", defaulted.Limit)
+	}
+	if defaulted.Padding != 0 {
+		t.Fatalf("expected default padding 0, got %d", defaulted.Padding)
+	}
+	if defaulted.Space != 12 {
+		t.Fatalf("expected default space 12, got %d", defaulted.Space)
+	}
+
+	maxed, err := normalizeOptions(Options{Limit: math.MaxInt})
+	if err != nil {
+		t.Fatalf("normalize max limit: %v", err)
+	}
+	if maxed.Limit != math.MaxInt {
+		t.Fatalf("expected max limit %d, got %d", math.MaxInt, maxed.Limit)
 	}
 }

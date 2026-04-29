@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"sort"
+	"sync"
 	"time"
 
 	"gthanks/internal/config"
@@ -130,28 +131,13 @@ func (s *Service) fetchLive(ctx context.Context, target domain.Target, includeSu
 			return domain.ContributionResponse{}, err
 		}
 
-		var partialErrors []domain.ErrorDetail
-		for _, repo := range repos {
-			if repo.Fork && !includeForks {
-				continue
-			}
-			contributors, requests, err := s.github.ListRepositoryContributors(ctx, repo.Owner, repo.Name)
-			response.GitHubRequestCount += requests
-			if err != nil {
-				detail := mapError(err, "failed to fetch repo contributors", repo.FullName, statusCode(err))
-				repo.Error = &detail
-				repo.FetchedAt = time.Now().UTC()
-				response.Repos = append(response.Repos, repo)
-				partialErrors = append(partialErrors, detail)
-				continue
-			}
-			repo.Contributors = contributors
-			repo.FetchedAt = time.Now().UTC()
-			response.Repos = append(response.Repos, repo)
-		}
+		repos = filterRepos(repos, includeForks)
+		fetchedRepos, contributorRequests, partialErrors := s.fetchRepositoryContributors(ctx, repos)
+		response.GitHubRequestCount += contributorRequests
+		response.Repos = fetchedRepos
+		response.Errors = partialErrors
 		if len(partialErrors) > 0 {
 			response.Metadata.Status = "partial_success"
-			response.Errors = partialErrors
 		}
 	default:
 		return domain.ContributionResponse{}, domain.ErrInvalidTarget
@@ -161,6 +147,103 @@ func (s *Service) fetchLive(ctx context.Context, target domain.Target, includeSu
 		response.Summary = buildSummary(response.Repos)
 	}
 	return response, nil
+}
+
+type repoContributorJob struct {
+	index int
+	repo  domain.Repo
+}
+
+type repoContributorResult struct {
+	index    int
+	repo     domain.Repo
+	requests int
+	err      *domain.ErrorDetail
+}
+
+func filterRepos(repos []domain.Repo, includeForks bool) []domain.Repo {
+	filtered := make([]domain.Repo, 0, len(repos))
+	for _, repo := range repos {
+		if repo.Fork && !includeForks {
+			continue
+		}
+		filtered = append(filtered, repo)
+	}
+	return filtered
+}
+
+func (s *Service) fetchRepositoryContributors(ctx context.Context, repos []domain.Repo) ([]domain.Repo, int, []domain.ErrorDetail) {
+	if len(repos) == 0 {
+		return []domain.Repo{}, 0, nil
+	}
+
+	workerCount := s.githubConcurrency(len(repos))
+	jobs := make(chan repoContributorJob)
+	results := make(chan repoContributorResult, len(repos))
+
+	var wg sync.WaitGroup
+	for i := 0; i < workerCount; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for job := range jobs {
+				results <- s.fetchRepositoryContributorJob(ctx, job)
+			}
+		}()
+	}
+
+	for index, repo := range repos {
+		jobs <- repoContributorJob{index: index, repo: repo}
+	}
+	close(jobs)
+	wg.Wait()
+	close(results)
+
+	fetchedRepos := make([]domain.Repo, len(repos))
+	partialErrorsByRepo := make([]*domain.ErrorDetail, len(repos))
+	requests := 0
+	for result := range results {
+		fetchedRepos[result.index] = result.repo
+		requests += result.requests
+		partialErrorsByRepo[result.index] = result.err
+	}
+
+	partialErrors := make([]domain.ErrorDetail, 0)
+	for _, detail := range partialErrorsByRepo {
+		if detail != nil {
+			partialErrors = append(partialErrors, *detail)
+		}
+	}
+
+	return fetchedRepos, requests, partialErrors
+}
+
+func (s *Service) fetchRepositoryContributorJob(ctx context.Context, job repoContributorJob) repoContributorResult {
+	repo := job.repo
+	contributors, requests, err := s.github.ListRepositoryContributors(ctx, repo.Owner, repo.Name)
+	repo.FetchedAt = time.Now().UTC()
+	if err != nil {
+		detail := mapError(err, "failed to fetch repo contributors", repo.FullName, statusCode(err))
+		repo.Error = &detail
+		return repoContributorResult{index: job.index, repo: repo, requests: requests, err: &detail}
+	}
+
+	repo.Contributors = contributors
+	return repoContributorResult{index: job.index, repo: repo, requests: requests}
+}
+
+func (s *Service) githubConcurrency(repoCount int) int {
+	if repoCount <= 0 {
+		return 0
+	}
+	concurrency := s.cfg.GitHubMaxConc
+	if concurrency <= 0 {
+		concurrency = 1
+	}
+	if concurrency > repoCount {
+		return repoCount
+	}
+	return concurrency
 }
 
 func (s *Service) persistResponse(ctx context.Context, cacheKey string, target domain.Target, response domain.ContributionResponse, expiresAt time.Time) error {

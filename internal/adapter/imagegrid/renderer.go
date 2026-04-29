@@ -21,17 +21,17 @@ import (
 )
 
 const (
-	defaultPerRow  = 5
-	defaultWidth   = 1200
-	defaultLimit   = 50
+	defaultPerRow  = 12
+	defaultWidth   = 1920
+	defaultLimit   = 1000
 	defaultPadding = 0
-	defaultSpace   = 0
+	defaultSpace   = 12
 	minPerRow      = 1
 	maxPerRow      = 20
 	minWidth       = 100
 	maxWidth       = 4000
 	minLimit       = 1
-	maxLimit       = 10000
+	maxLimit       = math.MaxInt
 	minSpacing     = 0
 	maxSpacing     = 500
 	avatarWorkers  = 4
@@ -46,12 +46,13 @@ const (
 )
 
 type Options struct {
-	PerRow  int
-	Width   int
-	Shape   Shape
-	Limit   int
-	Padding int
-	Space   int
+	PerRow   int
+	Width    int
+	Shape    Shape
+	Limit    int
+	Padding  int
+	Space    int
+	SpaceSet bool
 }
 
 type Renderer struct {
@@ -125,7 +126,7 @@ func normalizeOptions(options Options) (Options, error) {
 	if options.Padding == 0 {
 		options.Padding = defaultPadding
 	}
-	if options.Space == 0 {
+	if options.Space == 0 && !options.SpaceSet {
 		options.Space = defaultSpace
 	}
 	if options.Shape == "" {

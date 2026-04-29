@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>gthanks URL generator</title>
+  <title>GThanks</title>
   <style>
     :root {
       color-scheme: dark;
@@ -157,10 +157,34 @@
       line-height: 1.15;
     }
 
-    .theme-note {
+    .top-links {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      gap: 8px 12px;
       color: var(--subtle);
       font-size: 0.9rem;
-      white-space: nowrap;
+      text-align: right;
+    }
+
+    .top-links a {
+      color: var(--foam);
+      font-weight: 700;
+      text-decoration: none;
+    }
+
+    .top-links a:hover,
+    .top-links a:focus {
+      color: var(--rose);
+      text-decoration: underline;
+      text-underline-offset: 3px;
+    }
+
+    .top-links a:focus-visible {
+      outline: 2px solid var(--iris);
+      outline-offset: 3px;
+      border-radius: 4px;
     }
 
     .layout {
@@ -406,8 +430,9 @@
         grid-template-columns: 1fr;
       }
 
-      .theme-note {
-        display: none;
+      .top-links {
+        justify-content: flex-start;
+        text-align: left;
       }
     }
 
@@ -442,9 +467,12 @@
     <header class="topbar">
       <div class="brand">
         <div class="mark" aria-hidden="true">g</div>
-        <h1>gthanks URL generator</h1>
+        <h1>GThanks</h1>
       </div>
-      <div class="theme-note">Rose Pine main</div>
+      <div class="top-links">
+        <span>Made by <a href="https://yorukot.me">Yorukot</a> with Love</span>
+        <a href="https://github.com/yorukot/gthanks">View on GitHub</a>
+      </div>
     </header>
 
     <div class="layout">
@@ -497,11 +525,11 @@
             <div class="options hidden" data-image-options>
               <div class="field">
                 <label for="per-row">per_row</label>
-                <input id="per-row" type="number" min="1" max="20" step="1" value="5">
+                <input id="per-row" type="number" min="1" max="20" step="1" value="12">
               </div>
               <div class="field">
                 <label for="width">width</label>
-                <input id="width" type="number" min="100" max="4000" step="1" value="1200">
+                <input id="width" type="number" min="100" max="4000" step="1" value="1920">
               </div>
               <div class="field">
                 <label for="shape">shape</label>
@@ -512,7 +540,7 @@
               </div>
               <div class="field">
                 <label for="limit">limit</label>
-                <input id="limit" type="number" min="1" max="10000" step="1" value="50">
+                <input id="limit" type="number" min="1" max="9223372036854775807" step="1" value="1000">
               </div>
               <div class="field">
                 <label for="padding">padding</label>
@@ -520,14 +548,14 @@
               </div>
               <div class="field">
                 <label for="space">space</label>
-                <input id="space" type="number" min="0" max="500" step="1" value="0">
+                <input id="space" type="number" min="0" max="500" step="1" value="12">
               </div>
             </div>
           </div>
 
           <div class="actions">
             <button class="primary" id="open-url" type="button">Open URL</button>
-            <button id="preview-image" type="button">Preview Image</button>
+            <button id="preview-image" type="button">Reload Image</button>
             <button id="reset-form" type="button">Reset</button>
           </div>
         </div>
@@ -572,16 +600,17 @@
   <script>
     const defaults = {
       target: "yorukot",
-      perRow: "5",
-      width: "1200",
+      perRow: "12",
+      width: "1920",
       shape: "circle",
-      limit: "50",
+      limit: "1000",
       padding: "0",
-      space: "0"
+      space: "12"
     };
 
     const state = {
-      lastPreviewURL: ""
+      lastPreviewURL: "",
+      previewTimer: 0
     };
 
     const el = {
@@ -634,8 +663,15 @@
       return input.checked ? "true" : "false";
     }
 
+    const maxIntText = "9223372036854775807";
+    const maxInt = BigInt(maxIntText);
+
     function numberValue(input) {
       return Number.parseInt(input.value, 10);
+    }
+
+    function integerTextValue(input) {
+      return input.value.trim();
     }
 
     function validateTarget(value) {
@@ -663,16 +699,27 @@
       return "";
     }
 
+    function validateIntegerTextRange(label, value, min, max, maxLabel) {
+      if (!/^\d+$/.test(value)) {
+        return label + " must be an integer";
+      }
+      const parsed = BigInt(value);
+      if (parsed < BigInt(min) || parsed > max) {
+        return label + " must be between " + min + " and " + maxLabel;
+      }
+      return "";
+    }
+
     function validateImageOptions() {
       const perRow = numberValue(el.perRow);
       const width = numberValue(el.width);
-      const limit = numberValue(el.limit);
+      const limit = integerTextValue(el.limit);
       const padding = numberValue(el.padding);
       const space = numberValue(el.space);
       const checks = [
         validateRange("per_row", perRow, 1, 20),
         validateRange("width", width, 100, 4000),
-        validateRange("limit", limit, 1, 10000),
+        validateIntegerTextRange("limit", limit, 1, maxInt, "max_int"),
         validateRange("padding", padding, 0, 500),
         validateRange("space", space, 0, 500)
       ].filter(Boolean);
@@ -683,7 +730,7 @@
       if (width <= padding * 2 + (perRow - 1) * space) {
         return "width is too small for padding, space, and per_row";
       }
-      if (width < padding * 2 + Math.min(perRow, limit)) {
+      if (width < padding * 2 + perRow) {
         return "width is too small for padding";
       }
       return "";
@@ -750,17 +797,38 @@
       el.previewFrame.append(empty);
     }
 
+    function clearPreviewTimer() {
+      if (state.previewTimer) {
+        window.clearTimeout(state.previewTimer);
+        state.previewTimer = 0;
+      }
+    }
+
+    function schedulePreviewLoad(url, delay) {
+      if (state.lastPreviewURL === url) {
+        return;
+      }
+      clearPreviewTimer();
+      setPreviewEmpty("Loading image...");
+      state.previewTimer = window.setTimeout(() => {
+        loadPreview(url);
+      }, delay);
+    }
+
     function updatePreviewVisibility() {
       const isImage = endpoint() === "image";
       el.preview.classList.toggle("is-visible", isImage);
       el.previewImage.classList.toggle("hidden", !isImage);
       if (!isImage) {
+        clearPreviewTimer();
         state.lastPreviewURL = "";
         setPreviewEmpty("No image loaded");
       }
     }
 
-    function render() {
+    function render(options = {}) {
+      const autoPreview = options.autoPreview !== false;
+      const previewDelay = options.previewDelay ?? 500;
       const selected = endpoint();
       const error = validationMessage();
       const url = buildURL();
@@ -777,9 +845,18 @@
       el.curlOutput.value = curlFor(url);
       el.imageMarkdown.value = markdownFor(url);
 
-      if (selected === "image" && state.lastPreviewURL && state.lastPreviewURL !== url) {
+      if (selected !== "image") {
+        clearPreviewTimer();
+        return;
+      }
+      if (error) {
+        clearPreviewTimer();
         state.lastPreviewURL = "";
-        setPreviewEmpty("Preview is out of date");
+        setPreviewEmpty("No image loaded");
+        return;
+      }
+      if (autoPreview) {
+        schedulePreviewLoad(url, previewDelay);
       }
     }
 
@@ -800,13 +877,13 @@
       }, 1200);
     }
 
-    function loadPreview() {
+    function loadPreview(url = buildURL()) {
       const error = validationMessage();
-      if (error) {
-        render();
+      if (error || endpoint() !== "image") {
+        render({ autoPreview: false });
         return;
       }
-      const url = buildURL();
+      clearPreviewTimer();
       state.lastPreviewURL = url;
       el.previewFrame.innerHTML = "";
       const img = document.createElement("img");
@@ -833,7 +910,7 @@
       el.space.value = defaults.space;
       state.lastPreviewURL = "";
       setPreviewEmpty("No image loaded");
-      render();
+      render({ previewDelay: 0 });
     }
 
     formInputs.forEach((input) => {
@@ -851,7 +928,7 @@
       }
     });
 
-    el.previewImage.addEventListener("click", loadPreview);
+    el.previewImage.addEventListener("click", () => loadPreview());
     el.resetForm.addEventListener("click", resetForm);
 
     resetForm();

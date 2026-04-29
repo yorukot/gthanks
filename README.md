@@ -45,6 +45,7 @@ Important variables in `.env`:
 - `DB_PATH`: SQLite database path
 - `GITHUB_TOKEN`: optional, but recommended to avoid strict public rate limits
 - `PORT`: HTTP port
+- `GITHUB_MAX_CONCURRENCY`: max concurrent GitHub contributor requests for user/org targets
 
 Example:
 
@@ -52,6 +53,7 @@ Example:
 DB_PATH=./gthanks.sqlite3
 GITHUB_TOKEN=ghp_xxx
 PORT=8080
+GITHUB_MAX_CONCURRENCY=1
 ```
 
 ## API
@@ -100,17 +102,17 @@ GET /v1/contributions/image?target={target}&per_row={n}&width={px}&shape={circle
 Image query parameters:
 
 - `target`: required
-- `per_row`: optional, default `5`
-- `width`: optional, default `1200`
+- `per_row`: optional, default `12`
+- `width`: optional, default `1920`
 - `shape`: optional, `circle` or `square`, default `circle`
-- `limit`: optional, default `50`
+- `limit`: optional, default `1000`
 - `padding`: optional, default `0`
-- `space`: optional, default `0`
+- `space`: optional, default `12`
 - `include_forks`: optional, default `false`
 - `refresh`: optional, same behavior as JSON API
 
 The generated PNG uses a transparent background by default.
-`limit` currently accepts values from `1` to `10000`.
+`limit` currently accepts values from `1` to Go's `math.MaxInt`.
 
 ## Examples
 
@@ -129,7 +131,7 @@ curl "http://localhost:8080/v1/contributions?target=yorukot/superfile"
 Generate avatar grid PNG:
 
 ```bash
-curl "http://localhost:8080/v1/contributions/image?target=yorukot&per_row=5&width=1200&shape=circle&padding=0&space=0" --output contributors.png
+curl "http://localhost:8080/v1/contributions/image?target=yorukot&per_row=12&width=1920&shape=circle&limit=1000&padding=0&space=12" --output contributors.png
 ```
 
 The image endpoint is also cached in SQLite. The cache key includes `target`, `per_row`, `width`, `shape`, `limit`, `padding`, `space`, and `include_forks`.

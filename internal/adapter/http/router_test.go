@@ -61,7 +61,7 @@ func TestIndexRouteServesURLGenerator(t *testing.T) {
 
 	body := recorder.Body.String()
 	for _, want := range []string{
-		"gthanks URL generator",
+		"GThanks",
 		"/v1/contributions/image",
 		"/v1/contributions",
 	} {

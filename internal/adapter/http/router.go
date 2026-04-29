@@ -120,7 +120,7 @@ func contributionsImageHandler(cfg config.Config, service *usecase.Service, rend
 			writeError(w, nethttp.StatusBadRequest, "invalid_query", "padding must be an integer")
 			return
 		}
-		space, err := optionalInt(r, "space")
+		space, spaceSet, err := optionalIntWithPresence(r, "space")
 		if err != nil {
 			writeError(w, nethttp.StatusBadRequest, "invalid_query", "space must be an integer")
 			return
@@ -133,12 +133,13 @@ func contributionsImageHandler(cfg config.Config, service *usecase.Service, rend
 		}
 
 		imageOptions := imagegrid.Options{
-			PerRow:  perRow,
-			Width:   width,
-			Shape:   imagegrid.Shape(strings.ToLower(strings.TrimSpace(r.URL.Query().Get("shape")))),
-			Limit:   limit,
-			Padding: padding,
-			Space:   space,
+			PerRow:   perRow,
+			Width:    width,
+			Shape:    imagegrid.Shape(strings.ToLower(strings.TrimSpace(r.URL.Query().Get("shape")))),
+			Limit:    limit,
+			Padding:  padding,
+			Space:    space,
+			SpaceSet: spaceSet,
 		}
 		imageCacheKey, err := buildImageCacheKey(target, imageOptions, input.IncludeForks)
 		if err != nil {
@@ -235,11 +236,21 @@ func writeError(w nethttp.ResponseWriter, status int, code, message string) {
 }
 
 func optionalInt(r *nethttp.Request, key string) (int, error) {
-	raw := strings.TrimSpace(r.URL.Query().Get(key))
-	if raw == "" {
-		return 0, nil
+	value, _, err := optionalIntWithPresence(r, key)
+	return value, err
+}
+
+func optionalIntWithPresence(r *nethttp.Request, key string) (int, bool, error) {
+	rawValues, ok := r.URL.Query()[key]
+	if !ok || len(rawValues) == 0 {
+		return 0, false, nil
 	}
-	return strconv.Atoi(raw)
+	raw := strings.TrimSpace(rawValues[0])
+	if raw == "" {
+		return 0, true, nil
+	}
+	value, err := strconv.Atoi(raw)
+	return value, true, err
 }
 
 func buildImageCacheKey(target domain.Target, options imagegrid.Options, includeForks bool) (string, error) {

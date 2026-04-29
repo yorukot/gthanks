@@ -24,6 +24,9 @@ import (
 //go:embed static/index.html
 var indexHTML string
 
+//go:embed static/assets/logo.svg
+var logoSVG []byte
+
 const backgroundImageJobTimeout = 2 * time.Minute
 
 type imageJobResult struct {
@@ -43,6 +46,8 @@ func NewRouter(cfg config.Config, logger *slog.Logger, service *usecase.Service)
 	r.Use(middleware.RequestLogger(logger))
 
 	r.Get("/", indexHandler())
+	r.Get("/favicon.svg", svgHandler(logoSVG))
+	r.Get("/assets/logo.svg", svgHandler(logoSVG))
 	r.Get("/healthz", func(w nethttp.ResponseWriter, _ *nethttp.Request) {
 		writeJSON(w, nethttp.StatusOK, map[string]any{
 			"status": "ok",
@@ -60,6 +65,15 @@ func indexHandler() nethttp.HandlerFunc {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		w.WriteHeader(nethttp.StatusOK)
 		_, _ = w.Write([]byte(indexHTML))
+	}
+}
+
+func svgHandler(svg []byte) nethttp.HandlerFunc {
+	return func(w nethttp.ResponseWriter, _ *nethttp.Request) {
+		w.Header().Set("Content-Type", "image/svg+xml; charset=utf-8")
+		w.Header().Set("Cache-Control", "public, max-age=86400")
+		w.WriteHeader(nethttp.StatusOK)
+		_, _ = w.Write(svg)
 	}
 }
 

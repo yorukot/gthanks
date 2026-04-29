@@ -808,6 +808,18 @@
       return input.checked ? "true" : "false";
     }
 
+    function setBoolParamIfChanged(params, key, input, fallback) {
+      if (input.checked !== fallback) {
+        params.set(key, boolText(input));
+      }
+    }
+
+    function setValueParamIfChanged(params, key, value, fallback) {
+      if (value !== fallback) {
+        params.set(key, value);
+      }
+    }
+
     function boolParam(params, key, fallback) {
       const value = params.get(key);
       if (value === null) {
@@ -911,21 +923,21 @@
 
       const params = new URLSearchParams();
       params.set("target", el.target.value.trim());
-      params.set("refresh", boolText(el.refresh));
-      params.set("include_forks", boolText(el.includeForks));
-      params.set("include_bots", boolText(el.includeBots));
+      setBoolParamIfChanged(params, "refresh", el.refresh, defaults.refresh);
+      setBoolParamIfChanged(params, "include_forks", el.includeForks, defaults.includeForks);
+      setBoolParamIfChanged(params, "include_bots", el.includeBots, defaults.includeBots);
 
       if (selected === "json") {
-        params.set("summary", boolText(el.summary));
+        setBoolParamIfChanged(params, "summary", el.summary, defaults.summary);
       }
 
       if (selected === "image") {
-        params.set("per_row", el.perRow.value);
-        params.set("width", el.width.value);
-        params.set("shape", el.shape.value);
-        params.set("limit", el.limit.value);
-        params.set("padding", el.padding.value);
-        params.set("space", el.space.value);
+        setValueParamIfChanged(params, "per_row", el.perRow.value, defaults.perRow);
+        setValueParamIfChanged(params, "width", el.width.value, defaults.width);
+        setValueParamIfChanged(params, "shape", el.shape.value, defaults.shape);
+        setValueParamIfChanged(params, "limit", el.limit.value, defaults.limit);
+        setValueParamIfChanged(params, "padding", el.padding.value, defaults.padding);
+        setValueParamIfChanged(params, "space", el.space.value, defaults.space);
       }
 
       return base + path + "?" + params.toString();

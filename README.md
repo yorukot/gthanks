@@ -1,4 +1,6 @@
-![GThanks logo](assets/logo.png)
+<p align="center">
+  <img src="assets/logo.png" alt="GThanks logo" width="180">
+</p>
 
 # GThanks
 
@@ -54,26 +56,6 @@ These flags only apply to `/v1/contributions/image`.
 | `space` | integer | `12` | `0` to `500` | Spacing between avatars in pixels. |
 
 The image endpoint validates that `width` is large enough for the selected `per_row`, `padding`, and `space` values.
-
-## Examples
-
-JSON contribution data:
-
-```bash
-curl 'https://gthanks.yorukot.me/v1/contributions?target=yorukot/gthanks&summary=true'
-```
-
-PNG avatar grid:
-
-```text
-https://gthanks.yorukot.me/v1/contributions/image?target=yorukot/gthanks&per_row=8&width=960&shape=circle
-```
-
-Markdown image:
-
-```md
-![gthanks contributors](https://gthanks.yorukot.me/v1/contributions/image?target=yorukot/gthanks&per_row=8&width=960&shape=circle)
-```
 
 ## Cache Behavior
 

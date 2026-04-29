@@ -92,6 +92,7 @@ Query parameters:
 - `refresh`: optional, `true` to bypass fresh cache and fetch from GitHub again
 - `summary`: optional, default `true`; set `false` to skip cross-repo summary
 - `include_forks`: optional, default `false`; in user/org mode, forked repositories are excluded unless enabled
+- `include_bots`: optional, default `true`; set `false` to exclude bot contributors
 
 Avatar grid image endpoint:
 
@@ -105,14 +106,16 @@ Image query parameters:
 - `per_row`: optional, default `12`
 - `width`: optional, default `1920`
 - `shape`: optional, `circle` or `square`, default `circle`
-- `limit`: optional, default `1000`
+- `limit`: optional, default `144`
 - `padding`: optional, default `0`
 - `space`: optional, default `12`
 - `include_forks`: optional, default `false`
+- `include_bots`: optional, default `true`
 - `refresh`: optional, same behavior as JSON API
 
 The generated PNG uses a transparent background by default.
 `limit` currently accepts values from `1` to Go's `math.MaxInt`.
+Bot filtering only removes contributors whose GitHub API `type` is `Bot`.
 
 ## Examples
 
@@ -131,10 +134,10 @@ curl "http://localhost:8080/v1/contributions?target=yorukot/superfile"
 Generate avatar grid PNG:
 
 ```bash
-curl "http://localhost:8080/v1/contributions/image?target=yorukot&per_row=12&width=1920&shape=circle&limit=1000&padding=0&space=12" --output contributors.png
+curl "http://localhost:8080/v1/contributions/image?target=yorukot&per_row=12&width=1920&shape=circle&limit=144&padding=0&space=12" --output contributors.png
 ```
 
-The image endpoint is also cached in SQLite. The cache key includes `target`, `per_row`, `width`, `shape`, `limit`, `padding`, `space`, and `include_forks`.
+The image endpoint is also cached in SQLite. The cache key includes `target`, `per_row`, `width`, `shape`, `limit`, `padding`, `space`, `include_forks`, and `include_bots`.
 Avatar downloads are also cached in SQLite so future image renders do not need to refetch the same avatar bytes every time.
 
 Force refresh:
@@ -147,6 +150,12 @@ Include forked repositories in user/org mode:
 
 ```bash
 curl "http://localhost:8080/v1/contributions?target=yorukot&include_forks=true"
+```
+
+Exclude bot contributors:
+
+```bash
+curl "http://localhost:8080/v1/contributions?target=yorukot&include_bots=false"
 ```
 
 Disable summary:

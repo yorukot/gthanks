@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -262,6 +263,140 @@ func TestUserOrgModeCanIncludeForks(t *testing.T) {
 	}
 	if len(resp.Repos) != 2 {
 		t.Fatalf("expected forks to be included, got %d repos", len(resp.Repos))
+	}
+}
+
+func TestSingleRepoExcludesBotsWhenDisabled(t *testing.T) {
+	service := NewService(config.Config{
+		CacheTTLSingleRepo: time.Hour,
+		CacheTTLUserOrg:    3 * time.Hour,
+	}, &fakeStore{}, &fakeGitHub{
+		getRepoFn: func(context.Context, string, string) (domain.Repo, int, error) {
+			return domain.Repo{FullName: "yorukot/repo", Owner: "yorukot", Name: "repo"}, 1, nil
+		},
+		listOwnerReposFn: func(context.Context, string) ([]domain.Repo, int, error) {
+			return nil, 0, nil
+		},
+		listContributorsFn: func(context.Context, string, string) ([]domain.Contributor, int, error) {
+			return []domain.Contributor{
+				{IdentityKey: "github_user:1", Login: "alice", Type: "User", Contributions: 3},
+				{IdentityKey: "github_user:2", Login: "renovate[bot]", Type: "Bot", Contributions: 10},
+				{IdentityKey: "github_user:3", Login: "helper-bot", Type: "User", Contributions: 2},
+			}, 1, nil
+		},
+	})
+
+	resp, err := service.GetContributions(context.Background(), GetContributionsInput{
+		Target:         "yorukot/repo",
+		Summary:        true,
+		IncludeBots:    false,
+		IncludeBotsSet: true,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(resp.Repos) != 1 {
+		t.Fatalf("expected one repo, got %d", len(resp.Repos))
+	}
+	if len(resp.Repos[0].Contributors) != 2 {
+		t.Fatalf("expected only non-Bot contributors, got %#v", resp.Repos[0].Contributors)
+	}
+	for _, contributor := range resp.Repos[0].Contributors {
+		if contributor.Type == "Bot" {
+			t.Fatalf("expected Bot contributor to be filtered, got %#v", contributor)
+		}
+	}
+	if len(resp.Summary) != 2 {
+		t.Fatalf("expected bot-filtered summary, got %#v", resp.Summary)
+	}
+}
+
+func TestSingleRepoIncludesBotsByDefault(t *testing.T) {
+	service := NewService(config.Config{
+		CacheTTLSingleRepo: time.Hour,
+		CacheTTLUserOrg:    3 * time.Hour,
+	}, &fakeStore{}, &fakeGitHub{
+		getRepoFn: func(context.Context, string, string) (domain.Repo, int, error) {
+			return domain.Repo{FullName: "yorukot/repo", Owner: "yorukot", Name: "repo"}, 1, nil
+		},
+		listOwnerReposFn: func(context.Context, string) ([]domain.Repo, int, error) {
+			return nil, 0, nil
+		},
+		listContributorsFn: func(context.Context, string, string) ([]domain.Contributor, int, error) {
+			return []domain.Contributor{
+				{IdentityKey: "github_user:1", Login: "alice", Type: "User", Contributions: 3},
+				{IdentityKey: "github_user:2", Login: "renovate[bot]", Type: "Bot", Contributions: 10},
+			}, 1, nil
+		},
+	})
+
+	resp, err := service.GetContributions(context.Background(), GetContributionsInput{
+		Target:  "yorukot/repo",
+		Summary: true,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(resp.Repos) != 1 || len(resp.Repos[0].Contributors) != 2 {
+		t.Fatalf("expected bot contributor to be included, got %#v", resp.Repos)
+	}
+	if len(resp.Summary) != 2 {
+		t.Fatalf("expected summary to include bot contributor, got %#v", resp.Summary)
+	}
+}
+
+func TestUserOrgModeExcludesBotsFromSummaryWhenDisabled(t *testing.T) {
+	service := NewService(config.Config{
+		CacheTTLSingleRepo: time.Hour,
+		CacheTTLUserOrg:    3 * time.Hour,
+	}, &fakeStore{}, &fakeGitHub{
+		getRepoFn: func(context.Context, string, string) (domain.Repo, int, error) {
+			return domain.Repo{}, 0, nil
+		},
+		listOwnerReposFn: func(context.Context, string) ([]domain.Repo, int, error) {
+			return []domain.Repo{
+				{FullName: "yorukot/repo-a", Owner: "yorukot", Name: "repo-a"},
+				{FullName: "yorukot/repo-b", Owner: "yorukot", Name: "repo-b"},
+			}, 1, nil
+		},
+		listContributorsFn: func(_ context.Context, _ string, repo string) ([]domain.Contributor, int, error) {
+			return []domain.Contributor{
+				{IdentityKey: "github_user:1", Login: "alice", Type: "User", Contributions: 1},
+				{IdentityKey: "github_user:2", Login: repo + "-bot", Type: "Bot", Contributions: 20},
+			}, 1, nil
+		},
+	})
+
+	resp, err := service.GetContributions(context.Background(), GetContributionsInput{
+		Target:         "yorukot",
+		Summary:        true,
+		IncludeBots:    false,
+		IncludeBotsSet: true,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(resp.Summary) != 1 {
+		t.Fatalf("expected only one non-bot summary item, got %#v", resp.Summary)
+	}
+	if resp.Summary[0].Login != "alice" || resp.Summary[0].TotalContributions != 2 {
+		t.Fatalf("unexpected bot-filtered summary: %#v", resp.Summary)
+	}
+}
+
+func TestBuildCacheKeyIncludesBotOption(t *testing.T) {
+	target := domain.Target{NormalizedTarget: "yorukot/repo"}
+	withoutBots := buildCacheKey(target, true, false, false)
+	withBots := buildCacheKey(target, true, false, true)
+
+	if withoutBots == withBots {
+		t.Fatal("expected include_bots to change contribution cache key")
+	}
+	if !strings.Contains(withoutBots, "include_bots=false") {
+		t.Fatalf("expected bot-filtered cache key, got %q", withoutBots)
+	}
+	if !strings.Contains(withBots, "include_bots=true") {
+		t.Fatalf("expected bot-included cache key, got %q", withBots)
 	}
 }
 

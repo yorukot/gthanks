@@ -111,6 +111,13 @@
       font-weight: 600;
     }
 
+    .field-help {
+      margin: -2px 0 8px;
+      color: var(--muted);
+      font-size: 0.84rem;
+      line-height: 1.4;
+    }
+
     fieldset {
       margin: 0;
       padding: 0;
@@ -184,6 +191,36 @@
     .top-links a:focus-visible {
       outline: 2px solid var(--iris);
       outline-offset: 3px;
+      border-radius: 4px;
+    }
+
+    .support-title {
+      display: flex;
+      justify-content: center;
+      margin: 0 0 20px;
+      text-align: center;
+    }
+
+    .support-title a {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--gold);
+      font-size: 1rem;
+      font-weight: 800;
+      text-decoration: none;
+    }
+
+    .support-title a:hover,
+    .support-title a:focus {
+      color: var(--rose);
+      text-decoration: underline;
+      text-underline-offset: 3px;
+    }
+
+    .support-title a:focus-visible {
+      outline: 2px solid var(--iris);
+      outline-offset: 4px;
       border-radius: 4px;
     }
 
@@ -288,13 +325,14 @@
 
     .checks {
       display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(136px, 1fr));
       gap: 10px;
       grid-column: 1 / -1;
     }
 
     .check {
       display: flex;
+      min-width: 0;
       min-height: 44px;
       align-items: center;
       gap: 10px;
@@ -308,9 +346,16 @@
     }
 
     .check input {
+      flex: 0 0 18px;
       width: 18px;
       min-height: 18px;
       accent-color: var(--iris);
+    }
+
+    .check span {
+      min-width: 0;
+      overflow-wrap: anywhere;
+      line-height: 1.2;
     }
 
     .options {
@@ -475,6 +520,13 @@
       </div>
     </header>
 
+    <div class="support-title">
+      <a href="https://yorukot.me/thanks">
+        <span aria-hidden="true">&#9749;</span>
+        <span>Buy me a coffee</span>
+      </a>
+    </div>
+
     <div class="layout">
       <section class="panel" aria-labelledby="controls-title">
         <div class="panel-header">
@@ -484,7 +536,7 @@
         <div class="panel-body">
           <div class="grid">
             <fieldset class="field wide">
-              <legend>Endpoint</legend>
+              <legend>Output type</legend>
               <div class="segmented">
                 <label class="segment">
                   <input type="radio" name="endpoint" value="image" checked>
@@ -497,14 +549,10 @@
               </div>
             </fieldset>
 
-            <div class="field wide">
-              <label for="base-url">Base URL</label>
-              <input id="base-url" type="url" autocomplete="url" spellcheck="false">
-            </div>
-
             <div class="field wide" data-target-field>
               <label for="target">Target</label>
-              <input id="target" type="text" autocomplete="off" spellcheck="false" placeholder="yorukot or yorukot/superfile">
+              <p class="field-help" id="target-help">Use a GitHub user or organization like yorukot, or a repository like yorukot/gthanks.</p>
+              <input id="target" type="text" autocomplete="off" spellcheck="false" placeholder="yorukot or yorukot/gthanks" aria-describedby="target-help">
             </div>
 
             <div class="checks" data-shared-options>
@@ -519,6 +567,10 @@
               <label class="check">
                 <input id="include-forks" type="checkbox">
                 <span>include_forks</span>
+              </label>
+              <label class="check">
+                <input id="include-bots" type="checkbox" checked>
+                <span>include_bots</span>
               </label>
             </div>
 
@@ -540,7 +592,7 @@
               </div>
               <div class="field">
                 <label for="limit">limit</label>
-                <input id="limit" type="number" min="1" max="9223372036854775807" step="1" value="1000">
+                <input id="limit" type="number" min="1" max="9223372036854775807" step="1" value="144">
               </div>
               <div class="field">
                 <label for="padding">padding</label>
@@ -574,14 +626,6 @@
             <textarea class="url-output" id="url-output" readonly spellcheck="false"></textarea>
           </div>
 
-          <div>
-            <div class="result-head">
-              <h3>curl</h3>
-              <button class="copy" type="button" data-copy="curl-output">Copy curl</button>
-            </div>
-            <textarea id="curl-output" readonly spellcheck="false"></textarea>
-          </div>
-
           <div class="preview" id="preview">
             <div class="result-head">
               <h3>Preview</h3>
@@ -599,11 +643,16 @@
 
   <script>
     const defaults = {
+      output: "image",
       target: "yorukot",
+      refresh: false,
+      summary: true,
+      includeForks: false,
+      includeBots: true,
       perRow: "12",
       width: "1920",
       shape: "circle",
-      limit: "1000",
+      limit: "144",
       padding: "0",
       space: "12"
     };
@@ -614,11 +663,11 @@
     };
 
     const el = {
-      baseURL: document.querySelector("#base-url"),
       target: document.querySelector("#target"),
       refresh: document.querySelector("#refresh"),
       summary: document.querySelector("#summary"),
       includeForks: document.querySelector("#include-forks"),
+      includeBots: document.querySelector("#include-bots"),
       perRow: document.querySelector("#per-row"),
       width: document.querySelector("#width"),
       shape: document.querySelector("#shape"),
@@ -634,7 +683,6 @@
       previewImage: document.querySelector("#preview-image"),
       resetForm: document.querySelector("#reset-form"),
       urlOutput: document.querySelector("#url-output"),
-      curlOutput: document.querySelector("#curl-output"),
       preview: document.querySelector("#preview"),
       previewFrame: document.querySelector("#preview-frame"),
       imageMarkdown: document.querySelector("#image-markdown")
@@ -654,13 +702,21 @@
       return endpointInputs.find((input) => input.checked).value;
     }
 
-    function cleanBaseURL(value) {
-      const trimmed = value.trim();
-      return (trimmed || initialBaseURL()).replace(/\/+$/, "");
+    function setEndpoint(value) {
+      const endpointValue = value === "contributions" || value === "json" ? "contributions" : "image";
+      endpointInputs.find((input) => input.value === endpointValue).checked = true;
     }
 
     function boolText(input) {
       return input.checked ? "true" : "false";
+    }
+
+    function boolParam(params, key, fallback) {
+      const value = params.get(key);
+      if (value === null) {
+        return fallback;
+      }
+      return value === "true" || value === "1";
     }
 
     const maxIntText = "9223372036854775807";
@@ -750,7 +806,7 @@
 
     function buildURL() {
       const selected = endpoint();
-      const base = cleanBaseURL(el.baseURL.value);
+      const base = initialBaseURL().replace(/\/+$/, "");
       const path = {
         contributions: "/v1/contributions",
         image: "/v1/contributions/image"
@@ -760,6 +816,7 @@
       params.set("target", el.target.value.trim());
       params.set("refresh", boolText(el.refresh));
       params.set("include_forks", boolText(el.includeForks));
+      params.set("include_bots", boolText(el.includeBots));
 
       if (selected === "contributions") {
         params.set("summary", boolText(el.summary));
@@ -777,12 +834,41 @@
       return base + path + "?" + params.toString();
     }
 
-    function curlFor(url) {
-      const escaped = url.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
-      if (endpoint() === "image") {
-        return 'curl "' + escaped + '" --output contributors.png';
+    function buildPageParams() {
+      const selected = endpoint();
+      const params = new URLSearchParams();
+      params.set("output", selected === "contributions" ? "json" : "image");
+      params.set("target", el.target.value.trim());
+      params.set("refresh", boolText(el.refresh));
+      params.set("include_forks", boolText(el.includeForks));
+      params.set("include_bots", boolText(el.includeBots));
+
+      if (selected === "contributions") {
+        params.set("summary", boolText(el.summary));
       }
-      return 'curl "' + escaped + '"';
+
+      if (selected === "image") {
+        params.set("per_row", el.perRow.value);
+        params.set("width", el.width.value);
+        params.set("shape", el.shape.value);
+        params.set("limit", el.limit.value);
+        params.set("padding", el.padding.value);
+        params.set("space", el.space.value);
+      }
+
+      return params;
+    }
+
+    function syncPageURL() {
+      if (!window.history || !window.history.replaceState) {
+        return;
+      }
+      const query = buildPageParams().toString();
+      const nextURL = window.location.pathname + "?" + query + window.location.hash;
+      const currentURL = window.location.pathname + window.location.search + window.location.hash;
+      if (nextURL !== currentURL) {
+        window.history.replaceState(null, "", nextURL);
+      }
     }
 
     function markdownFor(url) {
@@ -842,8 +928,8 @@
       el.openURL.disabled = Boolean(error);
       el.previewImage.disabled = Boolean(error) || selected !== "image";
       el.urlOutput.value = url;
-      el.curlOutput.value = curlFor(url);
       el.imageMarkdown.value = markdownFor(url);
+      syncPageURL();
 
       if (selected !== "image") {
         clearPreviewTimer();
@@ -896,18 +982,55 @@
     }
 
     function resetForm() {
-      endpointInputs.find((input) => input.value === "image").checked = true;
-      el.baseURL.value = initialBaseURL();
+      setEndpoint(defaults.output);
       el.target.value = defaults.target;
-      el.refresh.checked = false;
-      el.summary.checked = true;
-      el.includeForks.checked = false;
+      el.refresh.checked = defaults.refresh;
+      el.summary.checked = defaults.summary;
+      el.includeForks.checked = defaults.includeForks;
+      el.includeBots.checked = defaults.includeBots;
       el.perRow.value = defaults.perRow;
       el.width.value = defaults.width;
       el.shape.value = defaults.shape;
       el.limit.value = defaults.limit;
       el.padding.value = defaults.padding;
       el.space.value = defaults.space;
+      state.lastPreviewURL = "";
+      setPreviewEmpty("No image loaded");
+      render({ previewDelay: 0 });
+    }
+
+    function loadFormFromPageURL() {
+      const params = new URLSearchParams(window.location.search);
+      resetForm();
+
+      setEndpoint(params.get("output") || params.get("endpoint") || defaults.output);
+      if (params.has("target")) {
+        el.target.value = params.get("target");
+      }
+      el.refresh.checked = boolParam(params, "refresh", defaults.refresh);
+      el.summary.checked = boolParam(params, "summary", defaults.summary);
+      el.includeForks.checked = boolParam(params, "include_forks", defaults.includeForks);
+      el.includeBots.checked = boolParam(params, "include_bots", defaults.includeBots);
+
+      if (params.has("per_row")) {
+        el.perRow.value = params.get("per_row");
+      }
+      if (params.has("width")) {
+        el.width.value = params.get("width");
+      }
+      if (params.has("shape")) {
+        el.shape.value = params.get("shape");
+      }
+      if (params.has("limit")) {
+        el.limit.value = params.get("limit");
+      }
+      if (params.has("padding")) {
+        el.padding.value = params.get("padding");
+      }
+      if (params.has("space")) {
+        el.space.value = params.get("space");
+      }
+
       state.lastPreviewURL = "";
       setPreviewEmpty("No image loaded");
       render({ previewDelay: 0 });
@@ -931,7 +1054,7 @@
     el.previewImage.addEventListener("click", () => loadPreview());
     el.resetForm.addEventListener("click", resetForm);
 
-    resetForm();
+    loadFormFromPageURL();
   </script>
 </body>
 </html>

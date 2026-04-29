@@ -65,11 +65,22 @@ func indexHandler() nethttp.HandlerFunc {
 
 func contributionsHandler(service *usecase.Service) nethttp.HandlerFunc {
 	return func(w nethttp.ResponseWriter, r *nethttp.Request) {
+		includeBots, includeBotsSet, err := optionalBool(r, "include_bots")
+		if err != nil {
+			writeError(w, nethttp.StatusBadRequest, "invalid_query", "include_bots must be a boolean")
+			return
+		}
+		if !includeBotsSet {
+			includeBots = true
+		}
+
 		input := usecase.GetContributionsInput{
-			Target:       r.URL.Query().Get("target"),
-			Refresh:      r.URL.Query().Get("refresh") == "true",
-			Summary:      true,
-			IncludeForks: r.URL.Query().Get("include_forks") == "true",
+			Target:         r.URL.Query().Get("target"),
+			Refresh:        r.URL.Query().Get("refresh") == "true",
+			Summary:        true,
+			IncludeForks:   r.URL.Query().Get("include_forks") == "true",
+			IncludeBots:    includeBots,
+			IncludeBotsSet: true,
 		}
 		if raw := r.URL.Query().Get("summary"); raw != "" {
 			parsed, err := strconv.ParseBool(raw)
@@ -93,11 +104,22 @@ func contributionsHandler(service *usecase.Service) nethttp.HandlerFunc {
 
 func contributionsImageHandler(cfg config.Config, service *usecase.Service, renderer *imagegrid.Renderer) nethttp.HandlerFunc {
 	return func(w nethttp.ResponseWriter, r *nethttp.Request) {
+		includeBots, includeBotsSet, err := optionalBool(r, "include_bots")
+		if err != nil {
+			writeError(w, nethttp.StatusBadRequest, "invalid_query", "include_bots must be a boolean")
+			return
+		}
+		if !includeBotsSet {
+			includeBots = true
+		}
+
 		input := usecase.GetContributionsInput{
-			Target:       strings.TrimSpace(r.URL.Query().Get("target")),
-			Refresh:      r.URL.Query().Get("refresh") == "true",
-			Summary:      true,
-			IncludeForks: r.URL.Query().Get("include_forks") == "true",
+			Target:         strings.TrimSpace(r.URL.Query().Get("target")),
+			Refresh:        r.URL.Query().Get("refresh") == "true",
+			Summary:        true,
+			IncludeForks:   r.URL.Query().Get("include_forks") == "true",
+			IncludeBots:    includeBots,
+			IncludeBotsSet: true,
 		}
 
 		perRow, err := optionalInt(r, "per_row")
@@ -141,7 +163,7 @@ func contributionsImageHandler(cfg config.Config, service *usecase.Service, rend
 			Space:    space,
 			SpaceSet: spaceSet,
 		}
-		imageCacheKey, err := buildImageCacheKey(target, imageOptions, input.IncludeForks)
+		imageCacheKey, err := buildImageCacheKey(target, imageOptions, input.IncludeForks, input.IncludeBots)
 		if err != nil {
 			writeError(w, nethttp.StatusBadRequest, "invalid_image_options", err.Error())
 			return
@@ -240,6 +262,19 @@ func optionalInt(r *nethttp.Request, key string) (int, error) {
 	return value, err
 }
 
+func optionalBool(r *nethttp.Request, key string) (bool, bool, error) {
+	rawValues, ok := r.URL.Query()[key]
+	if !ok || len(rawValues) == 0 {
+		return false, false, nil
+	}
+	raw := strings.TrimSpace(rawValues[0])
+	if raw == "" {
+		return false, true, nil
+	}
+	value, err := strconv.ParseBool(raw)
+	return value, true, err
+}
+
 func optionalIntWithPresence(r *nethttp.Request, key string) (int, bool, error) {
 	rawValues, ok := r.URL.Query()[key]
 	if !ok || len(rawValues) == 0 {
@@ -253,7 +288,7 @@ func optionalIntWithPresence(r *nethttp.Request, key string) (int, bool, error) 
 	return value, true, err
 }
 
-func buildImageCacheKey(target domain.Target, options imagegrid.Options, includeForks bool) (string, error) {
+func buildImageCacheKey(target domain.Target, options imagegrid.Options, includeForks bool, includeBots bool) (string, error) {
 	normalized, err := imagegrid.NormalizeOptionsForCache(options)
 	if err != nil {
 		return "", err
@@ -264,7 +299,8 @@ func buildImageCacheKey(target domain.Target, options imagegrid.Options, include
 		"|limit=" + strconv.Itoa(normalized.Limit) +
 		"|padding=" + strconv.Itoa(normalized.Padding) +
 		"|space=" + strconv.Itoa(normalized.Space) +
-		"|include_forks=" + strconv.FormatBool(includeForks), nil
+		"|include_forks=" + strconv.FormatBool(includeForks) +
+		"|include_bots=" + strconv.FormatBool(includeBots), nil
 }
 
 func ttlForTargetMode(cfg config.Config, mode string) time.Duration {

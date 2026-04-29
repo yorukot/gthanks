@@ -15,10 +15,12 @@ import (
 )
 
 type GetContributionsInput struct {
-	Target       string
-	Refresh      bool
-	Summary      bool
-	IncludeForks bool
+	Target         string
+	Refresh        bool
+	Summary        bool
+	IncludeForks   bool
+	IncludeBots    bool
+	IncludeBotsSet bool
 }
 
 type Service struct {
@@ -49,7 +51,8 @@ func (s *Service) GetContributions(ctx context.Context, input GetContributionsIn
 		return domain.ContributionResponse{}, err
 	}
 
-	cacheKey := buildCacheKey(target, input.Summary, input.IncludeForks)
+	includeBots := input.includeBots()
+	cacheKey := buildCacheKey(target, input.Summary, input.IncludeForks, includeBots)
 	cached, err := s.store.GetQueryCache(ctx, cacheKey)
 	if err != nil {
 		return domain.ContributionResponse{}, fmt.Errorf("%w: get query cache: %v", domain.ErrDatabase, err)
@@ -67,7 +70,7 @@ func (s *Service) GetContributions(ctx context.Context, input GetContributionsIn
 		return response, nil
 	}
 
-	response, liveErr := s.fetchLive(ctx, target, input.Summary, input.IncludeForks)
+	response, liveErr := s.fetchLive(ctx, target, input.Summary, input.IncludeForks, includeBots)
 	if liveErr == nil {
 		response.Metadata.GeneratedAt = now
 		if input.Refresh {
@@ -97,7 +100,14 @@ func (s *Service) GetContributions(ctx context.Context, input GetContributionsIn
 	return domain.ContributionResponse{}, liveErr
 }
 
-func (s *Service) fetchLive(ctx context.Context, target domain.Target, includeSummary bool, includeForks bool) (domain.ContributionResponse, error) {
+func (input GetContributionsInput) includeBots() bool {
+	if !input.IncludeBotsSet {
+		return true
+	}
+	return input.IncludeBots
+}
+
+func (s *Service) fetchLive(ctx context.Context, target domain.Target, includeSummary bool, includeForks bool, includeBots bool) (domain.ContributionResponse, error) {
 	response := domain.ContributionResponse{
 		Metadata: domain.Metadata{
 			Input:            target.Input,
@@ -121,7 +131,7 @@ func (s *Service) fetchLive(ctx context.Context, target domain.Target, includeSu
 		if err != nil {
 			return domain.ContributionResponse{}, err
 		}
-		repo.Contributors = contributors
+		repo.Contributors = filterContributors(contributors, includeBots)
 		repo.FetchedAt = time.Now().UTC()
 		response.Repos = append(response.Repos, repo)
 	case domain.ModeUserOrOrg:
@@ -132,7 +142,7 @@ func (s *Service) fetchLive(ctx context.Context, target domain.Target, includeSu
 		}
 
 		repos = filterRepos(repos, includeForks)
-		fetchedRepos, contributorRequests, partialErrors := s.fetchRepositoryContributors(ctx, repos)
+		fetchedRepos, contributorRequests, partialErrors := s.fetchRepositoryContributors(ctx, repos, includeBots)
 		response.GitHubRequestCount += contributorRequests
 		response.Repos = fetchedRepos
 		response.Errors = partialErrors
@@ -172,7 +182,22 @@ func filterRepos(repos []domain.Repo, includeForks bool) []domain.Repo {
 	return filtered
 }
 
-func (s *Service) fetchRepositoryContributors(ctx context.Context, repos []domain.Repo) ([]domain.Repo, int, []domain.ErrorDetail) {
+func filterContributors(contributors []domain.Contributor, includeBots bool) []domain.Contributor {
+	if includeBots {
+		return contributors
+	}
+
+	filtered := make([]domain.Contributor, 0, len(contributors))
+	for _, contributor := range contributors {
+		if contributor.Type == "Bot" {
+			continue
+		}
+		filtered = append(filtered, contributor)
+	}
+	return filtered
+}
+
+func (s *Service) fetchRepositoryContributors(ctx context.Context, repos []domain.Repo, includeBots bool) ([]domain.Repo, int, []domain.ErrorDetail) {
 	if len(repos) == 0 {
 		return []domain.Repo{}, 0, nil
 	}
@@ -187,7 +212,7 @@ func (s *Service) fetchRepositoryContributors(ctx context.Context, repos []domai
 		go func() {
 			defer wg.Done()
 			for job := range jobs {
-				results <- s.fetchRepositoryContributorJob(ctx, job)
+				results <- s.fetchRepositoryContributorJob(ctx, job, includeBots)
 			}
 		}()
 	}
@@ -218,7 +243,7 @@ func (s *Service) fetchRepositoryContributors(ctx context.Context, repos []domai
 	return fetchedRepos, requests, partialErrors
 }
 
-func (s *Service) fetchRepositoryContributorJob(ctx context.Context, job repoContributorJob) repoContributorResult {
+func (s *Service) fetchRepositoryContributorJob(ctx context.Context, job repoContributorJob, includeBots bool) repoContributorResult {
 	repo := job.repo
 	contributors, requests, err := s.github.ListRepositoryContributors(ctx, repo.Owner, repo.Name)
 	repo.FetchedAt = time.Now().UTC()
@@ -228,7 +253,7 @@ func (s *Service) fetchRepositoryContributorJob(ctx context.Context, job repoCon
 		return repoContributorResult{index: job.index, repo: repo, requests: requests, err: &detail}
 	}
 
-	repo.Contributors = contributors
+	repo.Contributors = filterContributors(contributors, includeBots)
 	return repoContributorResult{index: job.index, repo: repo, requests: requests}
 }
 
@@ -328,8 +353,8 @@ func buildSummary(repos []domain.Repo) []domain.SummaryItem {
 	return summary
 }
 
-func buildCacheKey(target domain.Target, summary bool, includeForks bool) string {
-	return fmt.Sprintf("%s|summary=%t|include_forks=%t", target.NormalizedTarget, summary, includeForks)
+func buildCacheKey(target domain.Target, summary bool, includeForks bool, includeBots bool) string {
+	return fmt.Sprintf("%s|summary=%t|include_forks=%t|include_bots=%t", target.NormalizedTarget, summary, includeForks, includeBots)
 }
 
 func ttlForMode(cfg config.Config, mode string) time.Duration {

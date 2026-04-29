@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"gthanks/internal/adapter/imagegrid"
 	"gthanks/internal/config"
 	"gthanks/internal/domain"
 	"gthanks/internal/usecase"
@@ -64,6 +65,8 @@ func TestIndexRouteServesURLGenerator(t *testing.T) {
 		"GThanks",
 		"/v1/contributions/image",
 		"/v1/contributions",
+		"include_bots",
+		`id="include-bots" type="checkbox" checked`,
 	} {
 		if !strings.Contains(body, want) {
 			t.Fatalf("expected index HTML to contain %q", want)
@@ -76,6 +79,40 @@ func TestIndexRouteServesURLGenerator(t *testing.T) {
 	jsonIndex := strings.Index(body, `value="contributions"`)
 	if imageIndex == -1 || jsonIndex == -1 || imageIndex > jsonIndex {
 		t.Fatal("expected image endpoint option to appear before JSON")
+	}
+}
+
+func TestImageCacheKeyIncludesBotOption(t *testing.T) {
+	target := domain.Target{NormalizedTarget: "yorukot/repo"}
+	withoutBots, err := buildImageCacheKey(target, imagegridOptionsForTest(), false, false)
+	if err != nil {
+		t.Fatalf("build image cache key without bots: %v", err)
+	}
+	withBots, err := buildImageCacheKey(target, imagegridOptionsForTest(), false, true)
+	if err != nil {
+		t.Fatalf("build image cache key with bots: %v", err)
+	}
+
+	if withoutBots == withBots {
+		t.Fatal("expected include_bots to change image cache key")
+	}
+	if !strings.Contains(withoutBots, "include_bots=false") {
+		t.Fatalf("expected bot-filtered image cache key, got %q", withoutBots)
+	}
+	if !strings.Contains(withBots, "include_bots=true") {
+		t.Fatalf("expected bot-included image cache key, got %q", withBots)
+	}
+}
+
+func imagegridOptionsForTest() imagegrid.Options {
+	return imagegrid.Options{
+		PerRow:   12,
+		Width:    1920,
+		Shape:    imagegrid.ShapeCircle,
+		Limit:    144,
+		Padding:  0,
+		Space:    12,
+		SpaceSet: true,
 	}
 }
 

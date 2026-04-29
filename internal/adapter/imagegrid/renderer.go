@@ -23,7 +23,7 @@ import (
 const (
 	defaultPerRow  = 12
 	defaultWidth   = 1920
-	defaultLimit   = 1000
+	defaultLimit   = 144
 	defaultPadding = 0
 	defaultSpace   = 12
 	minPerRow      = 1
@@ -78,7 +78,7 @@ func (r *Renderer) Render(ctx context.Context, summary []domain.SummaryItem, opt
 		return nil, fmt.Errorf("no contributors with avatar images")
 	}
 
-	cols := min(options.PerRow, len(summary))
+	cols := options.PerRow
 	cellSize := max(1, (options.Width-(options.Padding*2)-((cols-1)*options.Space))/cols)
 	rows := int(math.Ceil(float64(len(summary)) / float64(cols)))
 	height := (options.Padding * 2) + (rows * cellSize) + ((rows - 1) * options.Space)

@@ -95,6 +95,39 @@ func TestRenderRespectsPaddingAndSpace(t *testing.T) {
 	}
 }
 
+func TestRenderKeepsConfiguredColumnsForShortRow(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		img := image.NewRGBA(image.Rect(0, 0, 4, 4))
+		for y := 0; y < 4; y++ {
+			for x := 0; x < 4; x++ {
+				img.Set(x, y, color.RGBA{255, 0, 0, 255})
+			}
+		}
+		_ = png.Encode(w, img)
+	}))
+	defer server.Close()
+
+	renderer := NewRenderer(nil)
+	img, err := renderer.Render(context.Background(), []domain.SummaryItem{
+		{Login: "alice", AvatarURL: server.URL},
+	}, Options{PerRow: 12, Width: 1200, Shape: ShapeSquare, Limit: 1, Space: 12, SpaceSet: true})
+	if err != nil {
+		t.Fatalf("render: %v", err)
+	}
+
+	if img.Bounds().Dx() != 1200 {
+		t.Fatalf("expected width 1200, got %d", img.Bounds().Dx())
+	}
+	if img.Bounds().Dy() != 89 {
+		t.Fatalf("expected one configured-row height 89, got %d", img.Bounds().Dy())
+	}
+
+	emptySlot := color.RGBAModel.Convert(img.At(101, 0)).(color.RGBA)
+	if emptySlot != (color.RGBA{0, 0, 0, 0}) {
+		t.Fatalf("expected transparent empty slot after first contributor, got %#v", emptySlot)
+	}
+}
+
 func TestNormalizeOptionsValidation(t *testing.T) {
 	_, err := normalizeOptions(Options{Width: 99, Shape: ShapeSquare})
 	if err == nil {
@@ -113,8 +146,8 @@ func TestNormalizeOptionsDefaultsAndMaxLimit(t *testing.T) {
 	if defaulted.Width != 1920 {
 		t.Fatalf("expected default width 1920, got %d", defaulted.Width)
 	}
-	if defaulted.Limit != 1000 {
-		t.Fatalf("expected default limit 1000, got %d", defaulted.Limit)
+	if defaulted.Limit != 144 {
+		t.Fatalf("expected default limit 144, got %d", defaulted.Limit)
 	}
 	if defaulted.Padding != 0 {
 		t.Fatalf("expected default padding 0, got %d", defaulted.Padding)

@@ -53,8 +53,8 @@ func NewRouter(cfg config.Config, logger *slog.Logger, service *usecase.Service)
 			"time":   time.Now().UTC().Format(time.RFC3339),
 		})
 	})
-	r.Get("/v1/contributions", contributionsHandler(service))
-	r.Get("/v1/contributions/image", contributionsImageHandler(cfg, service, renderer))
+	r.Get("/json", contributionsHandler(service))
+	r.Get("/image", contributionsImageHandler(cfg, service, renderer))
 
 	return r
 }

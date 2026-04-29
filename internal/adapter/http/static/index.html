@@ -640,7 +640,7 @@
                   <span>Image</span>
                 </label>
                 <label class="segment">
-                  <input type="radio" name="endpoint" value="contributions">
+                  <input type="radio" name="endpoint" value="json">
                   <span>JSON</span>
                 </label>
               </div>
@@ -800,7 +800,7 @@
     }
 
     function setEndpoint(value) {
-      const endpointValue = value === "contributions" || value === "json" ? "contributions" : "image";
+      const endpointValue = value === "contributions" || value === "json" ? "json" : "image";
       endpointInputs.find((input) => input.value === endpointValue).checked = true;
     }
 
@@ -905,8 +905,8 @@
       const selected = endpoint();
       const base = initialBaseURL().replace(/\/+$/, "");
       const path = {
-        contributions: "/v1/contributions",
-        image: "/v1/contributions/image"
+        json: "/json",
+        image: "/image"
       }[selected];
 
       const params = new URLSearchParams();
@@ -915,7 +915,7 @@
       params.set("include_forks", boolText(el.includeForks));
       params.set("include_bots", boolText(el.includeBots));
 
-      if (selected === "contributions") {
+      if (selected === "json") {
         params.set("summary", boolText(el.summary));
       }
 
@@ -934,13 +934,13 @@
     function buildPageParams() {
       const selected = endpoint();
       const params = new URLSearchParams();
-      params.set("output", selected === "contributions" ? "json" : "image");
+      params.set("output", selected);
       params.set("target", el.target.value.trim());
       params.set("refresh", boolText(el.refresh));
       params.set("include_forks", boolText(el.includeForks));
       params.set("include_bots", boolText(el.includeBots));
 
-      if (selected === "contributions") {
+      if (selected === "json") {
         params.set("summary", boolText(el.summary));
       }
 
@@ -1016,7 +1016,7 @@
       const error = validationMessage();
       const url = buildURL();
 
-      el.summaryOption.classList.toggle("hidden", selected !== "contributions");
+      el.summaryOption.classList.toggle("hidden", selected !== "json");
       el.imageOptions.classList.toggle("hidden", selected !== "image");
       updatePreviewVisibility();
 

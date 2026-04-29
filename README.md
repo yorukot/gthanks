@@ -15,7 +15,7 @@ https://gthanks.yorukot.me
 Example image:
 
 <p align="center">
-  <img src="https://gthanks.yorukot.me/v1/contributions/image?target=yorukot" alt="GThanks contributors example for yorukot" width="720">
+  <img src="https://gthanks.yorukot.me/image?target=yorukot" alt="GThanks contributors example for yorukot" width="720">
 </p>
 
 ## What It Does
@@ -31,7 +31,7 @@ For user and organization targets, GThanks lists repositories, fetches contribut
 
 ### Shared Flags
 
-These flags work on both `/v1/contributions` and `/v1/contributions/image`.
+These flags work on both `/json` and `/image`.
 
 | Flag | Type | Default | Required | Description |
 | --- | --- | --- | --- | --- |
@@ -42,7 +42,7 @@ These flags work on both `/v1/contributions` and `/v1/contributions/image`.
 
 ### JSON Flags
 
-These flags only apply to `/v1/contributions`.
+These flags only apply to `/json`.
 
 | Flag | Type | Default | Required | Description |
 | --- | --- | --- | --- | --- |
@@ -50,7 +50,7 @@ These flags only apply to `/v1/contributions`.
 
 ### Image Flags
 
-These flags only apply to `/v1/contributions/image`.
+These flags only apply to `/image`.
 
 | Flag | Type | Default | Range | Description |
 | --- | --- | --- | --- | --- |

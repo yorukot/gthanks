@@ -63,8 +63,8 @@ func TestIndexRouteServesURLGenerator(t *testing.T) {
 	body := recorder.Body.String()
 	for _, want := range []string{
 		"GThanks",
-		"/v1/contributions/image",
-		"/v1/contributions",
+		"/image",
+		"/json",
 		"include_bots",
 		`id="include-bots" type="checkbox" checked`,
 	} {
@@ -75,10 +75,39 @@ func TestIndexRouteServesURLGenerator(t *testing.T) {
 	if strings.Contains(body, "/healthz") || strings.Contains(body, ">Health<") {
 		t.Fatal("expected index HTML not to expose the health endpoint")
 	}
+	if strings.Contains(body, "/v1/contributions") {
+		t.Fatal("expected index HTML to use simplified endpoints only")
+	}
 	imageIndex := strings.Index(body, `value="image"`)
-	jsonIndex := strings.Index(body, `value="contributions"`)
+	jsonIndex := strings.Index(body, `value="json"`)
 	if imageIndex == -1 || jsonIndex == -1 || imageIndex > jsonIndex {
 		t.Fatal("expected image endpoint option to appear before JSON")
+	}
+}
+
+func TestSimplifiedContributionRoutes(t *testing.T) {
+	router := testRouter()
+
+	for _, path := range []string{"/json", "/image"} {
+		request := httptest.NewRequest(nethttp.MethodGet, path, nil)
+		recorder := httptest.NewRecorder()
+
+		router.ServeHTTP(recorder, request)
+
+		if recorder.Code == nethttp.StatusNotFound {
+			t.Fatalf("expected %s route to exist", path)
+		}
+	}
+
+	for _, path := range []string{"/v1/contributions", "/v1/contributions/image"} {
+		request := httptest.NewRequest(nethttp.MethodGet, path, nil)
+		recorder := httptest.NewRecorder()
+
+		router.ServeHTTP(recorder, request)
+
+		if recorder.Code != nethttp.StatusNotFound {
+			t.Fatalf("expected legacy route %s to return 404, got %d", path, recorder.Code)
+		}
 	}
 }
 

@@ -14,8 +14,8 @@ import (
 )
 
 const (
-	jsonContributionsPath  = "/v1/contributions"
-	imageContributionsPath = "/v1/contributions/image"
+	jsonContributionsPath  = "/json"
+	imageContributionsPath = "/image"
 )
 
 type statusRecorder struct {

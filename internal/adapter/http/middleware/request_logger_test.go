@@ -11,7 +11,7 @@ import (
 )
 
 func TestRequestLoggerIncludesImageContributionDetails(t *testing.T) {
-	record := logRequest(t, "/v1/contributions/image?target=acme/widget&refresh=true&include_forks=true&include_bots=false&per_row=8&width=800&shape=square&limit=24&padding=4&space=2")
+	record := logRequest(t, "/image?target=acme/widget&refresh=true&include_forks=true&include_bots=false&per_row=8&width=800&shape=square&limit=24&padding=4&space=2")
 
 	assertStringField(t, record, "output_format", "image")
 	assertBoolField(t, record, "image_request", true)
@@ -36,7 +36,7 @@ func TestRequestLoggerIncludesImageContributionDetails(t *testing.T) {
 }
 
 func TestRequestLoggerIncludesJSONContributionDetails(t *testing.T) {
-	record := logRequest(t, "/v1/contributions?target=acme&summary=false&include_bots=true")
+	record := logRequest(t, "/json?target=acme&summary=false&include_bots=true")
 
 	assertStringField(t, record, "output_format", "json")
 	assertBoolField(t, record, "image_request", false)
@@ -59,7 +59,7 @@ func TestRequestLoggerTextOutputFlattensContributionQuery(t *testing.T) {
 	handler := RequestLogger(logger, NewRealIPResolver())(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
-	request := httptest.NewRequest(http.MethodGet, "/v1/contributions/image?target=yorukot/superfile&refresh=false&include_forks=false&include_bots=false&per_row=12&width=1920&shape=square&limit=144&padding=0&space=12", nil)
+	request := httptest.NewRequest(http.MethodGet, "/image?target=yorukot/superfile&refresh=false&include_forks=false&include_bots=false&per_row=12&width=1920&shape=square&limit=144&padding=0&space=12", nil)
 
 	handler.ServeHTTP(httptest.NewRecorder(), request)
 
@@ -94,7 +94,7 @@ func TestRequestLoggerLogsOnlyResolvedRemoteAddr(t *testing.T) {
 	headers.Set("CF-Ray", "abc123-TPE")
 	headers.Set("CF-IPCountry", "TW")
 
-	record := logRequestWithResolver(t, "/v1/contributions?target=acme", "10.0.0.5:443", headers, NewRealIPResolver())
+	record := logRequestWithResolver(t, "/json?target=acme", "10.0.0.5:443", headers, NewRealIPResolver())
 
 	assertStringField(t, record, "remote_addr", "203.0.113.10")
 	assertMissingField(t, record, "real_ip")

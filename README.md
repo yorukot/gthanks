@@ -12,6 +12,12 @@ The hosted API is available at:
 https://gthanks.yorukot.me
 ```
 
+Example image:
+
+<p align="center">
+  <img src="https://gthanks.yorukot.me/v1/contributions/image?target=yorukot" alt="GThanks contributors example for yorukot" width="720">
+</p>
+
 ## What It Does
 
 GThanks accepts a GitHub target in one of two forms:

@@ -31,7 +31,7 @@ const (
 	minWidth       = 100
 	maxWidth       = 4000
 	minLimit       = 1
-	maxLimit       = math.MaxInt
+	maxLimit       = 2000
 	minSpacing     = 0
 	maxSpacing     = 500
 	avatarWorkers  = 4
@@ -84,19 +84,7 @@ func (r *Renderer) Render(ctx context.Context, summary []domain.SummaryItem, opt
 	height := (options.Padding * 2) + (rows * cellSize) + ((rows - 1) * options.Space)
 
 	canvas := image.NewRGBA(image.Rect(0, 0, options.Width, height))
-	avatars := r.fetchAvatars(ctx, summary)
-
-	for index := range summary {
-		avatar := avatars[index]
-		if avatar == nil {
-			continue
-		}
-		col := index % cols
-		row := index / cols
-		x := options.Padding + col*(cellSize+options.Space)
-		y := options.Padding + row*(cellSize+options.Space)
-		drawAvatar(canvas, avatar, image.Rect(x, y, x+cellSize, y+cellSize), options.Shape)
-	}
+	r.drawAvatars(ctx, canvas, summary, options, cellSize)
 
 	return canvas, nil
 }
@@ -178,19 +166,23 @@ func clampSummary(summary []domain.SummaryItem, limit int) []domain.SummaryItem 
 	return filtered
 }
 
-func (r *Renderer) fetchAvatars(ctx context.Context, summary []domain.SummaryItem) []image.Image {
+func (r *Renderer) drawAvatars(ctx context.Context, canvas draw.Image, summary []domain.SummaryItem, options Options, cellSize int) {
 	type job struct {
 		index int
 		url   string
 	}
+	type result struct {
+		index  int
+		avatar image.Image
+	}
 
-	avatars := make([]image.Image, len(summary))
 	jobs := make(chan job)
+	results := make(chan result, avatarWorkers)
 	var wg sync.WaitGroup
 
 	workers := min(avatarWorkers, len(summary))
 	if workers == 0 {
-		return avatars
+		return
 	}
 
 	for i := 0; i < workers; i++ {
@@ -205,20 +197,38 @@ func (r *Renderer) fetchAvatars(ctx context.Context, summary []domain.SummaryIte
 				if err != nil {
 					continue
 				}
-				avatars[task.index] = avatar
+				select {
+				case results <- result{index: task.index, avatar: avatar}:
+				case <-ctx.Done():
+					return
+				}
 			}
 		}()
 	}
 
-	for index, item := range summary {
-		if ctx.Err() != nil {
-			break
+	go func() {
+		defer close(jobs)
+		for index, item := range summary {
+			select {
+			case jobs <- job{index: index, url: item.AvatarURL}:
+			case <-ctx.Done():
+				return
+			}
 		}
-		jobs <- job{index: index, url: item.AvatarURL}
+	}()
+
+	go func() {
+		wg.Wait()
+		close(results)
+	}()
+
+	for item := range results {
+		col := item.index % options.PerRow
+		row := item.index / options.PerRow
+		x := options.Padding + col*(cellSize+options.Space)
+		y := options.Padding + row*(cellSize+options.Space)
+		drawAvatar(canvas, item.avatar, image.Rect(x, y, x+cellSize, y+cellSize), options.Shape)
 	}
-	close(jobs)
-	wg.Wait()
-	return avatars
 }
 
 func (r *Renderer) fetchAvatar(ctx context.Context, avatarURL string) (image.Image, error) {

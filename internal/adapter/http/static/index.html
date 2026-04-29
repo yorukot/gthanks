@@ -689,7 +689,7 @@
               </div>
               <div class="field">
                 <label for="limit">limit</label>
-                <input id="limit" type="number" min="1" max="9223372036854775807" step="1" value="144">
+                <input id="limit" type="number" min="1" max="2000" step="1" value="144">
               </div>
               <div class="field">
                 <label for="padding">padding</label>
@@ -828,8 +828,7 @@
       return value === "true" || value === "1";
     }
 
-    const maxIntText = "9223372036854775807";
-    const maxInt = BigInt(maxIntText);
+    const maxImageLimit = BigInt(2000);
 
     function numberValue(input) {
       return Number.parseInt(input.value, 10);
@@ -884,7 +883,7 @@
       const checks = [
         validateRange("per_row", perRow, 1, 20),
         validateRange("width", width, 100, 4000),
-        validateIntegerTextRange("limit", limit, 1, maxInt, "max_int"),
+        validateIntegerTextRange("limit", limit, 1, maxImageLimit, "2000"),
         validateRange("padding", padding, 0, 500),
         validateRange("space", space, 0, 500)
       ].filter(Boolean);

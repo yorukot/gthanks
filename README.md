@@ -57,7 +57,7 @@ These flags only apply to `/image`.
 | `per_row` | integer | `12` | `1` to `20` | Number of avatars per row. |
 | `width` | integer | `1920` | `100` to `4000` | Output image width in pixels. |
 | `shape` | string | `circle` | `circle`, `square` | Avatar mask shape. |
-| `limit` | integer | `144` | `1` to max integer | Maximum number of contributor avatars to render. |
+| `limit` | integer | `144` | `1` to `2000` | Maximum number of contributor avatars to render. |
 | `padding` | integer | `0` | `0` to `500` | Outer image padding in pixels. |
 | `space` | integer | `12` | `0` to `500` | Spacing between avatars in pixels. |
 

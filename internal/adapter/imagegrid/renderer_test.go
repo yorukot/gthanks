@@ -5,7 +5,6 @@ import (
 	"image"
 	"image/color"
 	"image/png"
-	"math"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -135,7 +134,7 @@ func TestNormalizeOptionsValidation(t *testing.T) {
 	}
 }
 
-func TestNormalizeOptionsDefaultsAndMaxLimit(t *testing.T) {
+func TestNormalizeOptionsDefaultsAndLimitBounds(t *testing.T) {
 	defaulted, err := normalizeOptions(Options{})
 	if err != nil {
 		t.Fatalf("normalize default options: %v", err)
@@ -156,11 +155,16 @@ func TestNormalizeOptionsDefaultsAndMaxLimit(t *testing.T) {
 		t.Fatalf("expected default space 12, got %d", defaulted.Space)
 	}
 
-	maxed, err := normalizeOptions(Options{Limit: math.MaxInt})
+	maxed, err := normalizeOptions(Options{Limit: maxLimit})
 	if err != nil {
 		t.Fatalf("normalize max limit: %v", err)
 	}
-	if maxed.Limit != math.MaxInt {
-		t.Fatalf("expected max limit %d, got %d", math.MaxInt, maxed.Limit)
+	if maxed.Limit != maxLimit {
+		t.Fatalf("expected max limit %d, got %d", maxLimit, maxed.Limit)
+	}
+
+	_, err = normalizeOptions(Options{Limit: maxLimit + 1})
+	if err == nil {
+		t.Fatal("expected limit above max to fail validation")
 	}
 }

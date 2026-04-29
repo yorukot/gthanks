@@ -344,6 +344,7 @@ func computeImageJob(
 	}
 
 	pngBytes, err := imagegrid.EncodePNGBytes(img)
+	img = nil
 	if err != nil {
 		return imageJobResult{err: err}
 	}

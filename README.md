@@ -1,257 +1,88 @@
-# gthanks
+![GThanks logo](assets/logo.png)
 
-Go API service for GitHub contribution aggregation.
+# GThanks
+
+GThanks is a Go API service that aggregates GitHub repository contributor data and can return either JSON or a transparent PNG avatar grid.
+
+The hosted API is available at:
+
+```text
+https://gthanks.yorukot.me
+```
 
 ## What It Does
 
-This API accepts either:
+GThanks accepts a GitHub target in one of two forms:
 
-- a GitHub user or org, such as `yorukot`
-- a single repository, such as `yorukot/superfile`
+- `owner`, for a GitHub user or organization, such as `yorukot`
+- `owner/repo`, for a single repository, such as `yorukot/gthanks`
 
-It returns contribution data based on the GitHub REST contributors endpoint.
+For user and organization targets, GThanks lists repositories, fetches contributor data for each repository, and aggregates contributor totals. For single repository targets, it fetches contributor data for that repository only.
 
-## Current Status
+## Query Flags
 
-MVP foundation is in place:
+### Shared Flags
 
-- Go module
-- `chi` router
-- `slog` logger
-- SQLite storage
-- SQL migrations
-- GitHub REST client
-- `GET /v1/contributions`
-- `/healthz` endpoint
-- graceful shutdown
+These flags work on both `/v1/contributions` and `/v1/contributions/image`.
 
-## Run
+| Flag | Type | Default | Required | Description |
+| --- | --- | --- | --- | --- |
+| `target` | string | none | yes | GitHub user, organization, or repository. Use `owner` or `owner/repo`. |
+| `refresh` | boolean | `false` | no | When `true`, bypasses fresh cache and fetches live GitHub data. |
+| `include_forks` | boolean | `false` | no | Includes forked repositories for user or organization targets. |
+| `include_bots` | boolean | `true` | no | Includes contributors whose GitHub type is `Bot`. |
 
-```bash
-cp .env.example .env
-go run ./cmd/server
-```
+### JSON Flags
 
-Default server address:
+These flags only apply to `/v1/contributions`.
 
-```text
-http://localhost:8080
-```
+| Flag | Type | Default | Required | Description |
+| --- | --- | --- | --- | --- |
+| `summary` | boolean | `true` | no | Includes the aggregated contributor summary when `true`. |
 
-## Configuration
+### Image Flags
 
-Important variables in `.env`:
+These flags only apply to `/v1/contributions/image`.
 
-- `DB_PATH`: SQLite database path
-- `GITHUB_TOKEN`: optional, but recommended to avoid strict public rate limits
-- `PORT`: HTTP port
-- `GITHUB_MAX_CONCURRENCY`: max concurrent GitHub contributor requests for user/org targets
+| Flag | Type | Default | Range | Description |
+| --- | --- | --- | --- | --- |
+| `per_row` | integer | `12` | `1` to `20` | Number of avatars per row. |
+| `width` | integer | `1920` | `100` to `4000` | Output image width in pixels. |
+| `shape` | string | `circle` | `circle`, `square` | Avatar mask shape. |
+| `limit` | integer | `144` | `1` to max integer | Maximum number of contributor avatars to render. |
+| `padding` | integer | `0` | `0` to `500` | Outer image padding in pixels. |
+| `space` | integer | `12` | `0` to `500` | Spacing between avatars in pixels. |
 
-Example:
-
-```env
-DB_PATH=./gthanks.sqlite3
-GITHUB_TOKEN=ghp_xxx
-PORT=8080
-GITHUB_MAX_CONCURRENCY=1
-```
-
-## API
-
-### Health Check
-
-```bash
-curl http://localhost:8080/healthz
-```
-
-Example response:
-
-```json
-{
-  "status": "ok",
-  "time": "2026-04-23T04:00:00Z"
-}
-```
-
-### Get Contributions
-
-Endpoint:
-
-```text
-GET /v1/contributions?target={target}
-```
-
-Supported targets:
-
-- `yorukot`
-- `yorukot/superfile`
-
-Query parameters:
-
-- `target`: required
-- `refresh`: optional, `true` to bypass fresh cache and fetch from GitHub again
-- `summary`: optional, default `true`; set `false` to skip cross-repo summary
-- `include_forks`: optional, default `false`; in user/org mode, forked repositories are excluded unless enabled
-- `include_bots`: optional, default `true`; set `false` to exclude bot contributors
-
-Avatar grid image endpoint:
-
-```text
-GET /v1/contributions/image?target={target}&per_row={n}&width={px}&shape={circle|square}&padding={px}&space={px}
-```
-
-Image query parameters:
-
-- `target`: required
-- `per_row`: optional, default `12`
-- `width`: optional, default `1920`
-- `shape`: optional, `circle` or `square`, default `circle`
-- `limit`: optional, default `144`
-- `padding`: optional, default `0`
-- `space`: optional, default `12`
-- `include_forks`: optional, default `false`
-- `include_bots`: optional, default `true`
-- `refresh`: optional, same behavior as JSON API
-
-The generated PNG uses a transparent background by default.
-`limit` currently accepts values from `1` to Go's `math.MaxInt`.
-Bot filtering only removes contributors whose GitHub API `type` is `Bot`.
+The image endpoint validates that `width` is large enough for the selected `per_row`, `padding`, and `space` values.
 
 ## Examples
 
-User or org mode:
+JSON contribution data:
 
 ```bash
-curl "http://localhost:8080/v1/contributions?target=yorukot"
+curl 'https://gthanks.yorukot.me/v1/contributions?target=yorukot/gthanks&summary=true'
 ```
 
-Single repo mode:
+PNG avatar grid:
 
-```bash
-curl "http://localhost:8080/v1/contributions?target=yorukot/superfile"
+```text
+https://gthanks.yorukot.me/v1/contributions/image?target=yorukot/gthanks&per_row=8&width=960&shape=circle
 ```
 
-Generate avatar grid PNG:
+Markdown image:
 
-```bash
-curl "http://localhost:8080/v1/contributions/image?target=yorukot&per_row=12&width=1920&shape=circle&limit=144&padding=0&space=12" --output contributors.png
-```
-
-The image endpoint is also cached in SQLite. The cache key includes `target`, `per_row`, `width`, `shape`, `limit`, `padding`, `space`, `include_forks`, and `include_bots`.
-Avatar downloads are also cached in SQLite so future image renders do not need to refetch the same avatar bytes every time.
-
-Force refresh:
-
-```bash
-curl "http://localhost:8080/v1/contributions?target=yorukot/superfile&refresh=true"
-```
-
-Include forked repositories in user/org mode:
-
-```bash
-curl "http://localhost:8080/v1/contributions?target=yorukot&include_forks=true"
-```
-
-Exclude bot contributors:
-
-```bash
-curl "http://localhost:8080/v1/contributions?target=yorukot&include_bots=false"
-```
-
-Disable summary:
-
-```bash
-curl "http://localhost:8080/v1/contributions?target=yorukot&summary=false"
-```
-
-## Response Shape
-
-Top-level response fields:
-
-- `metadata`
-- `cache`
-- `summary`
-- `repos`
-- `errors`
-
-Example:
-
-```json
-{
-  "metadata": {
-    "input": "yorukot/superfile",
-    "normalized_target": "yorukot/superfile",
-    "mode": "single_repo",
-    "status": "success",
-    "generated_at": "2026-04-23T04:00:00Z"
-  },
-  "cache": {
-    "status": "miss",
-    "expires_at": "2026-04-23T05:00:00Z"
-  },
-  "summary": [
-    {
-      "identity_key": "github_user:123",
-      "login": "yorukot",
-      "avatar_url": "https://avatars.githubusercontent.com/u/123?v=4",
-      "html_url": "https://github.com/yorukot",
-      "total_contributions": 42,
-      "repo_count": 1,
-      "repos": [
-        {
-          "full_name": "yorukot/superfile",
-          "html_url": "https://github.com/yorukot/superfile",
-          "contributions": 42
-        }
-      ]
-    }
-  ],
-  "repos": [
-    {
-      "full_name": "yorukot/superfile",
-      "owner": "yorukot",
-      "name": "superfile",
-      "html_url": "https://github.com/yorukot/superfile",
-      "private": false,
-      "archived": false,
-      "fork": false,
-      "fetched_at": "2026-04-23T04:00:00Z",
-      "contributors": [
-        {
-          "identity_key": "github_user:123",
-          "login": "yorukot",
-          "github_user_id": 123,
-          "avatar_url": "https://avatars.githubusercontent.com/u/123?v=4",
-          "html_url": "https://github.com/yorukot",
-          "type": "User",
-          "contributions": 42
-        }
-      ]
-    }
-  ],
-  "errors": []
-}
+```md
+![gthanks contributors](https://gthanks.yorukot.me/v1/contributions/image?target=yorukot/gthanks&per_row=8&width=960&shape=circle)
 ```
 
 ## Cache Behavior
 
-- Fresh cache returns immediately
-- Cache miss fetches from GitHub, stores SQLite snapshots, then returns JSON
-- If refresh fails and stale cache exists, the API returns stale data with `cache.status = "stale"`
+GThanks stores query responses, generated images, repository snapshots, and downloaded avatars in SQLite.
 
-Response headers:
+| Cache | Default TTL | Notes |
+| --- | --- | --- |
+| Single repository query/image | `1h` | Configured with `CACHE_TTL_SINGLE_REPO`. |
+| User or organization query/image | `3h` | Configured with `CACHE_TTL_USER_ORG`. |
+| Avatar downloads | `24h` | Used internally by the image renderer. |
 
-- `X-Cache-Status`
-- `X-Image-Cache-Status`
-- `X-GitHub-Requests`
-
-For user/org targets, each `summary` item also includes a `repos` array so you can see which repositories that contributor appeared in.
-
-## Common Status Codes
-
-- `200`: success, including stale fallback and partial success
-- `400`: invalid target or invalid query parameter
-- `404`: target not found on GitHub and no stale cache available
-- `429`: GitHub rate limit hit and no stale cache available
-- `502`: upstream GitHub failure
-- `500`: internal application error
+When `refresh=true`, GThanks skips fresh query and image cache entries and requests live GitHub data. If GitHub refresh fails and stale cached data exists, the JSON endpoint can return stale data with an error entry, and the image endpoint can return a stale image.

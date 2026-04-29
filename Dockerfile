@@ -27,6 +27,7 @@ RUN apk add --no-cache ca-certificates sqlite-libs \
 	&& chown -R app:app /data /app
 
 COPY --from=builder /out/gthanks /usr/local/bin/gthanks
+COPY --from=builder /src/migrations ./migrations
 
 ENV APP_ENV=production
 ENV PORT=8080
